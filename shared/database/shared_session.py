@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from shared.core.shared_config import get_settings
+from shared.core.shared_config import get_global_settings
 
-SETTINGS = get_settings()
+SETTINGS = get_global_settings()
 
 async_engine: AsyncEngine = create_async_engine(
     url=SETTINGS.ASYNC_DB_URL,

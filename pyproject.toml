@@ -4,4 +4,10 @@ version = "0.1.0"
 description = "A minimalistic API Gateway"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
+    "fastapi[all]>=0.140.0",
+    "psycopg2>=2.9.12",
+    "sqlalchemy>=2.0.51",
+]
