@@ -1,36 +1,96 @@
 from apps.user_service.app.main import app
 from apps.user_service.app.api import models
-from apps.user_service.app.api.routers import users
+from apps.user_service.app.api.routers import user
 from apps.user_service.app.api.routers import router
+from apps.user_service.app.utils import get_user_email
 from apps.user_service.app.api.models.base import Base
 from apps.user_service.app.core.security import Security
-from apps.user_service.app.api.schemas.auth import AuthBase
-from apps.user_service.app.api.schemas.users import UserBase
+from apps.user_service.app.api.models.email import Email
 from apps.user_service.app.api.repo.otp import OtpRepository
+from apps.user_service.app.api.repo.user import UserRepository
 from apps.user_service.app.core.config import get_user_settings
 from apps.user_service.app.api.models.otp import Otp, OtpStatus
 from apps.user_service.app.api.services.auth import AuthService
-from apps.user_service.app.api.models.users import User, UserType
+from apps.user_service.app.api.services.user import UserService
+from apps.user_service.app.api.repo.email import EmailRepository
+from apps.user_service.app.api.models.user import User, UserType
+from apps.user_service.app.api.services.email import EmailService
+from apps.user_service.app.api.schemas.email import EmailInDB, EmailBase
+from apps.user_service.app.deps import AuthServiceDep, UserServiceDep, EmailServiceDep
+from apps.user_service.app.api.schemas.user import (
+    UserBase,
+    UserInDB,
+    EmailUserResponse,
+    GoogleUserResponse,
+)
+from apps.user_service.app.api.schemas.auth import (
+    Token,
+    AuthBase,
+    TokenData,
+    ResendOtp,
+    EmailLogin,
+    EmailVerify,
+    EmailSignUp,
+    SignUpResponse,
+    LogoutResponse,
+    OtpResendResponse,
+)
+from apps.user_service.app.core.exceptions import (
+    AuthorizationError,
+    AuthenticationError,
+    CredentialError,
+    UserExistsError,
+    InvalidOtpError,
+    UserNotFoundError,
+)
 from apps.user_service.app.deps import get_auth_service, get_security, SecurityDep
-
 
 __all__ = [
     "app",
     "Otp",
     "Base",
     "User",
-    "users",
+    "user",
+    "Email",
+    "Token",
     "models",
     "router",
+    "ResendOtp",
+    "UserInDB",
     "AuthBase",
     "UserBase",
     "UserType",
     "Security",
+    "TokenData",
     "OtpStatus",
+    "EmailInDB",
+    "EmailBase",
+    "EmailLogin",
+    "EmailSignUp",
+    "EmailVerify",
     "AuthService",
+    "UserService",
     "SecurityDep",
+    "EmailService",
     "get_security",
     "OtpRepository",
+    "UserRepository",
+    "SignUpResponse",
+    "get_user_email",
+    "LogoutResponse",
+    "AuthServiceDep",
+    "UserServiceDep",
+    "EmailServiceDep",
+    "OtpResendResponse",
+    "EmailUserResponse",
+    "GoogleUserResponse",
+    "EmailRepository",
+    "AuthorizationError",
+    "AuthenticationError",
+    "CredentialError",
+    "UserExistsError",
+    "InvalidOtpError",
+    "UserNotFoundError",
     "get_auth_service",
     "get_user_settings",
 ]

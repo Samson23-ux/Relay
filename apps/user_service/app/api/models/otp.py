@@ -13,7 +13,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
 )
 
-from app.api.models.base import Base
+from apps.user_service import Base
 
 
 class OtpStatus(str, enum.Enum):

@@ -4,4 +4,8 @@ version = "0.1.0"
 description = "A minimalistic API Gateway"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "redis>=8.0.1",
+]

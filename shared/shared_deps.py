@@ -4,7 +4,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from shared import get_session, RedisRepository
+from shared import get_session, RedisRepository, UnitOfWorkRepository
 
 
 # ------------------- DB dependency ------------------------------ #
@@ -28,4 +28,9 @@ async def get_redis_repo(redis: RedisDep) -> RedisRepository:
     return RedisRepository(async_redis=redis)
 
 
+async def get_unit_of_work(session: DBSession) -> UnitOfWorkRepository:
+    return UnitOfWorkRepository(session=session)
+
+
 RedisRepo = Annotated[RedisRepository, Depends(get_redis_repo)]
+UnitOfWorkRepo = Annotated[UnitOfWorkRepository, Depends(get_unit_of_work)]

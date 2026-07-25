@@ -42,20 +42,17 @@ def get_security_mock():
 
 class TestSignUpWithEmail:
     @pytest.mark.anyio
-    async def test_sign_up(self, create_user: tuple[httpx.Response]):
-        create_res, _ = create_user
-        json_res = create_res.json()
+    async def test_sign_up(self, create_user: httpx.Response):
+        json_res = create_user.json()
 
-        assert create_res.status_code == 201
+        assert create_user.status_code == 201
         assert json_res["message"] == (
             "Sign up completed successfully."
             "Check your email for verification code and instructions"
         )
 
     @pytest.mark.anyio
-    async def test_user_exists(
-        self, async_client: httpx.AsyncClient, verify_user
-    ):
+    async def test_user_exists(self, async_client: httpx.AsyncClient, verify_user):
         sign_up_payload: dict = {
             "email": "user@example.com",
             "display_name": "test_user",
@@ -85,16 +82,15 @@ class TestSignUpWithEmail:
 
 class TestLogin:
     @pytest.mark.anyio
-    async def test_login(self, async_client: httpx.AsyncClient, login: tuple[httpx.Response]):
-        login_res, _ = login
-        json_res = login_res.json()
+    async def test_login(self, async_client: httpx.AsyncClient, login: httpx.Response):
+        json_res = login.json()
 
-        assert login_res.status_code == 201
+        assert login.status_code == 201
         assert "access_token" in json_res["data"]
 
     @pytest.mark.anyio
     async def test_user_not_verified(
-        self, async_client: httpx.AsyncClient, create_user: tuple[httpx.Response]
+        self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
         login_payload: dict = {
             "email": "user@example.com",
@@ -159,7 +155,7 @@ class TestSignUpWithGoogle:
 class TestAuthToken:
     @pytest.mark.anyio
     async def test_get_access_token(
-        self, async_client: httpx.AsyncClient, login: tuple[httpx.Response]
+        self, async_client: httpx.AsyncClient, login: httpx.Response
     ):
         res = await async_client.post(
             "/auth/refresh",
@@ -184,16 +180,11 @@ class TestAuthToken:
 
 class TestGetCurrentUser:
     @pytest.mark.anyio
-    async def test_get_current_user(
-        self, async_client: httpx.AsyncClient, login: tuple[httpx.Response]
-    ):
-        login_res, _ = login
-        access_token = login_res.json()["data"]["access_token"]
-
+    async def test_get_current_user(self, async_client: httpx.AsyncClient):
         res: httpx.Response = await async_client.get(
             "/auth/me",
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
             },
         )
@@ -216,7 +207,7 @@ class TestGetCurrentUser:
 class TestResendOtp:
     @pytest.mark.anyio
     async def test_resend_otp_token(
-        self, async_client: httpx.AsyncClient, create_user: tuple[httpx.Response]
+        self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
         path: str = "app.api.services.auth.send_verification_email.apply_async"
 
@@ -240,7 +231,7 @@ class TestResendOtp:
 
     @pytest.mark.anyio
     async def test_invalid_email_otp_token(
-        self, async_client: httpx.AsyncClient, create_user: tuple[httpx.Response]
+        self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
         resend_otp_payload: dict = {
             "email": "user@example123.com",
@@ -257,14 +248,11 @@ class TestResendOtp:
 
 class TestLogout:
     @pytest.mark.anyio
-    async def test_logout(self, async_client: httpx.AsyncClient, login: tuple[httpx.Response]):
-        login_res, _ = login
-        access_token = login_res.json()["data"]["access_token"]
-
+    async def test_logout(self, async_client: httpx.AsyncClient):
         res = await async_client.post(
             "/auth/logout",
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
             },
         )
@@ -274,7 +262,7 @@ class TestLogout:
         res: httpx.Response = await async_client.get(
             "/auth/me",
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
             },
         )
@@ -295,16 +283,11 @@ class TestLogout:
 
 class TestDeleteAccount:
     @pytest.mark.anyio
-    async def test_delete_account(
-        self, async_client: httpx.AsyncClient, login: tuple[httpx.Response]
-    ):
-        login_res, _ = login
-        access_token = login_res.json()["data"]["access_token"]
-
+    async def test_delete_account(self, async_client: httpx.AsyncClient):
         res = await async_client.delete(
             "/auth",
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
             },
         )
@@ -330,7 +313,7 @@ class TestDeleteAccount:
     ):
         res = await async_client.delete(
             "/auth",
-            headers={"env": "test"},
+            headers={"X-USER-EMAIL": "user@example.com", "env": "test"},
         )
 
         assert res.status_code == 401

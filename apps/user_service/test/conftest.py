@@ -22,19 +22,15 @@ from apps.user_service import Otp
 from apps.user_service import Base
 from shared import RedisRepository
 from shared import get_global_settings
-from apps.user_service import AuthService
-from apps.user_service import get_auth_service
 from shared import get_session, get_redis_client
 from apps.user_service import models  # noqa: F401
-
-
-SETTINGS = get_global_settings()
+from apps.user_service import get_auth_service, AuthService, get_user_settings
 
 
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
     async_db_engine: AsyncEngine = create_async_engine(
-        url=SETTINGS.ASYNC_TEST_DB_URL, poolclass=NullPool
+        url=get_user_settings().USER_TEST_DB_URL, poolclass=NullPool
     )
 
     async with async_db_engine.begin() as conn:
@@ -98,7 +94,7 @@ async def async_session(async_engine: AsyncEngine):
 async def test_redis_client():
     try:
         redis_client: Redis = Redis.from_url(
-            SETTINGS.REDIS_URL, decode_responses=True
+            get_global_settings().REDIS_URL, decode_responses=True
         )
         yield redis_client
     finally:
