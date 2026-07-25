@@ -1,12 +1,10 @@
-from shared import get_db_session
-from apps.user_service import (
-    OtpRepository,
-    OtpService,
-    UserRepository,
-    UserService,
-    EmailRepository,
-    EmailService,
-)
+from shared.worker.db import get_db_session
+from apps.user_service.app.api.repo.otp import OtpRepository
+from apps.user_service.app.api.services.otp import OtpService
+from apps.user_service.app.api.repo.user import UserRepository
+from apps.user_service.app.api.services.user import UserService
+from apps.user_service.app.api.repo.email import EmailRepository
+from apps.user_service.app.api.services.email import EmailService
 
 
 def get_email_service() -> EmailService:

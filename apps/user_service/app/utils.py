@@ -1,4 +1,4 @@
-from apps.user_service import User
+from apps.user_service.app.api.models.user import User
 
 
 def get_user_email(user: User) -> str:

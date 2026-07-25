@@ -1,4 +1,5 @@
-from shared import RedisRepository, get_redis_client
+from shared.repo.redis import RedisRepository
+from shared.shared_deps import get_redis_client
 
 
 def get_redis_repo() -> RedisRepository:

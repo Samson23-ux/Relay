@@ -2,8 +2,11 @@ import sentry_sdk
 import sentry_sdk.logger as sentry_logger
 
 
-from shared import ServerError
-from apps.user_service import User, UserInDB, UserNotFoundError, UserRepository
+from shared.core.exceptions import ServerError
+from apps.user_service.app.api.models.user import User
+from apps.user_service.app.api.schemas.user import UserInDB
+from apps.user_service.app.api.repo.user import UserRepository
+from apps.user_service.app.core.exceptions import UserNotFoundError
 
 
 class UserService:

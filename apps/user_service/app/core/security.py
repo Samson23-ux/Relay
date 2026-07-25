@@ -8,8 +8,8 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 from datetime import datetime, timezone, timedelta
 from authlib.integrations.starlette_client import OAuth
 
-from app.api.schemas.auth import TokenData
-from apps.user_service import get_user_settings
+from apps.user_service.app.api.schemas.auth import TokenData
+from apps.user_service.app.core.config import get_user_settings
 
 
 class Security:
@@ -26,7 +26,7 @@ class Security:
             client_secret=self.SETTINGS.GOOGLE_CLIENT_SECRET,
             server_metadata_url=self.SETTINGS.GOOGLE_OAUTH_URL,
             client_kwargs={
-                "scope": "openid email profile",
+                "scope": "openid email",
             },
         )
 

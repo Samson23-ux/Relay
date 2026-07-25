@@ -2,8 +2,8 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from apps.user_service import UserType
-from apps.user_service import OtpStatus
+from apps.user_service.app.api.models.user import UserType
+from apps.user_service.app.api.models.otp import OtpStatus
 
 
 class AuthBase(BaseModel):

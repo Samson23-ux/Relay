@@ -1,4 +1,4 @@
-from shared import AppException
+from shared.core.exceptions import AppException
 
 
 class AuthenticationError(AppException):

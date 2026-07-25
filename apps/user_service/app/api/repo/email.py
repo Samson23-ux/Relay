@@ -1,8 +1,9 @@
 from typing import Any
 
 
-from shared import BaseRepository
-from apps.user_service import Email, EmailBase
+from shared.repo.base_repo import BaseRepository
+from apps.user_service.app.api.models.email import Email
+from apps.user_service.app.api.schemas.email import EmailBase
 
 
 class EmailRepository(BaseRepository[EmailBase, Email]):

@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from apps.user_service import Base
-from apps.user_service import models  # noqa:  F401
-from shared import get_global_settings
+from apps.user_service.app.api.models.base import Base
+from shared.core.shared_config import get_global_settings
+from apps.user_service.app.api import models  # noqa:  F401
 
 db_url: str = get_global_settings().ASYNC_DB_URL
 

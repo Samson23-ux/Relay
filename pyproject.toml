@@ -15,4 +15,8 @@ dependencies = [
     "pytest-asyncio>=1.4.0",
     "redis>=8.0.1",
     "resend>=2.34.0",
+    "asgi-lifespan>=2.1.0",
+    "python-jose>=3.5.0",
+    "pwdlib[argon2]>=0.3.0",
+    "authlib>=1.7.2",
 ]

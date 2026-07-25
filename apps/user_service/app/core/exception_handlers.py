@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 
 
-from shared import create_exception_handler
-from apps.user_service import (
+from shared.core.exceptions import create_exception_handler
+from apps.user_service.app.core.exceptions import (
+    AuthorizationError,
     AuthenticationError,
+    CredentialError,
     UserExistsError,
     InvalidOtpError,
-    UserNotFoundError,
-    CredentialError,
-    AuthorizationError,
+    UserNotFoundError
 )
 
 
@@ -16,6 +16,7 @@ class UserExceptionHandler:
     def __init__(self, app: FastAPI):
         self._app = app
 
+    def add_handlers(self):
         self._app.add_exception_handler(
             AuthenticationError,
             create_exception_handler(

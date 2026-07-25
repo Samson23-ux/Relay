@@ -3,30 +3,36 @@ from uuid import UUID, uuid7
 import sentry_sdk.logger as sentry_logger
 
 
-from shared import RedisRepository, ServerError, UnitOfWorkRepository
-from apps.user_service import (
-    Otp,
-    User,
-    Security,
-    UserInDB,
+from shared.repo.redis import RedisRepository
+from shared.core.exceptions import ServerError
+from shared.repo.uow import UnitOfWorkRepository
+from apps.user_service.app.api.models.otp import Otp
+from apps.user_service.app.utils import get_user_email
+from apps.user_service.app.api.models.user import User
+from apps.user_service.app.core.security import Security
+from apps.user_service.app.api.repo.otp import OtpRepository
+from apps.user_service.app.api.schemas.email import EmailInDB
+from apps.user_service.app.api.repo.user import UserRepository
+from apps.user_service.app.core.config import get_user_settings
+from apps.user_service.app.api.services.user import UserService
+from apps.user_service.app.api.services.email import EmailService
+from apps.user_service.app.worker.tasks.email import send_verification_email
+from apps.user_service.app.api.schemas.auth import (
     TokenData,
-    EmailInDB,
     ResendOtp,
     EmailLogin,
-    UserService,
     EmailVerify,
-    EmailService,
-    OtpRepository,
-    UserRepository,
-    get_user_email,
+)
+from apps.user_service.app.core.exceptions import (
+    AuthenticationError,
+    CredentialError,
     UserExistsError,
     InvalidOtpError,
-    CredentialError,
-    get_user_settings,
+)
+from apps.user_service.app.api.schemas.user import (
+    UserInDB,
     EmailUserResponse,
     GoogleUserResponse,
-    AuthenticationError,
-    send_verification_email
 )
 
 

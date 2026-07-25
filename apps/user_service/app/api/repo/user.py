@@ -1,8 +1,8 @@
 from typing import Any
 
-from shared import BaseRepository
-from apps.user_service import User
-from apps.user_service import UserBase
+from shared.repo.base_repo import BaseRepository
+from apps.user_service.app.api.models.user import User
+from apps.user_service.app.api.schemas.user import UserBase
 
 
 class UserRepository(BaseRepository[UserBase, User]):

@@ -4,7 +4,9 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from shared import get_session, RedisRepository, UnitOfWorkRepository
+from shared.repo.redis import RedisRepository
+from shared.repo.uow import UnitOfWorkRepository
+from shared.database.shared_session import get_session
 
 
 # ------------------- DB dependency ------------------------------ #

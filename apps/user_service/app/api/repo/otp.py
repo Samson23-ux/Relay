@@ -1,9 +1,9 @@
 from typing import Any
 from datetime import datetime, timezone
 
-from shared import BaseRepository
-from apps.user_service import Otp
-from apps.user_service import AuthBase
+from shared.repo.base_repo import BaseRepository
+from apps.user_service.app.api.models.otp import Otp
+from apps.user_service.app.api.schemas.auth import AuthBase
 
 
 class OtpRepository(BaseRepository[AuthBase, Otp]):

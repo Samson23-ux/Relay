@@ -1,7 +1,7 @@
 import sentry_sdk
 from celery import Celery
 
-from shared import get_global_settings
+from shared.core.shared_config import get_global_settings
 
 SETTINGS = get_global_settings()
 

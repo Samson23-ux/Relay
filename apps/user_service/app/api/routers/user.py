@@ -2,23 +2,22 @@ from fastapi.responses import RedirectResponse
 from fastapi import APIRouter, Request, Response
 
 
-from apps.user_service import get_user_settings
-from shared import get_global_settings, UnitOfWorkRepo, SuccessResponse
-from apps.user_service import (
+from shared.shared_deps import UnitOfWorkRepo
+from apps.user_service.app.deps import SecurityDep
+from shared.schemas.response import SuccessResponse
+from shared.core.shared_config import get_global_settings
+from apps.user_service.app.core.config import get_user_settings
+from apps.user_service.app.deps import AuthServiceDep, UserServiceDep, EmailServiceDep
+from apps.user_service.app.api.schemas.user import EmailUserResponse, GoogleUserResponse
+from apps.user_service.app.api.schemas.auth import (
     Token,
     ResendOtp,
     EmailLogin,
-    SecurityDep,
-    EmailSignUp,
     EmailVerify,
-    AuthServiceDep,
-    UserServiceDep,
+    EmailSignUp,
     SignUpResponse,
     LogoutResponse,
-    EmailServiceDep,
-    EmailUserResponse,
-    OtpResendResponse,
-    GoogleUserResponse,
+    OtpResendResponse
 )
 
 router = APIRouter()

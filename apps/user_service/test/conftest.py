@@ -4,8 +4,8 @@ from sqlalchemy import text
 from redis.asyncio import Redis
 from sqlalchemy.pool import NullPool
 from asgi_lifespan import LifespanManager
+from unittest.mock import patch, AsyncMock
 from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport, Response
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -17,14 +17,16 @@ from sqlalchemy.ext.asyncio import (
 )
 
 
-from app.main import app
-from apps.user_service import Otp
-from apps.user_service import Base
-from shared import RedisRepository
-from shared import get_global_settings
-from shared import get_session, get_redis_client
-from apps.user_service import models  # noqa: F401
-from apps.user_service import get_auth_service, AuthService, get_user_settings
+from apps.user_service.app.main import app
+from shared.repo.redis import RedisRepository
+from shared.shared_deps import get_redis_client
+from apps.user_service.app.api.models.otp import Otp
+from apps.user_service.app.api.models.base import Base
+from shared.database.shared_session import get_session
+from apps.user_service.app.deps import get_auth_service
+from shared.core.shared_config import get_global_settings
+from apps.user_service.app.api import models  # noqa: F401
+from apps.user_service.app.api.services.auth import AuthService
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -126,7 +128,9 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
 @pytest_asyncio.fixture
 async def create_user(async_client: AsyncClient):
-    path: str = "app.api.services.auth.send_verification_email.apply_async"
+    path: str = (
+        "apps.user_service.app.api.services.auth.send_verification_email.apply_async"
+    )
 
     sign_up_payload: dict = {
         "email": "user@example.com",

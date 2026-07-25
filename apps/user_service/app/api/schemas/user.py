@@ -3,11 +3,12 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 
-from apps.user_service import UserType
+from apps.user_service.app.api.models.user import UserType, UserRole
 
 
 class UserBase(BaseModel):
     type: UserType
+    role: UserRole = UserRole.USER
     is_active: bool = False
     is_verified: bool = False
 

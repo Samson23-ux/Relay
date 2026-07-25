@@ -3,8 +3,9 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 
-from apps.user_service import Email
-from shared import celery_app, get_email_service
+from shared.worker.celery_app import celery_app
+from apps.user_service.app.api.models.email import Email
+from apps.user_service.app.worker.services import get_email_service
 
 
 class BaseTaskWithFailure(celery_app.Task):

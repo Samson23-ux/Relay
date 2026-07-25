@@ -3,8 +3,10 @@ import sentry_sdk
 from uuid import UUID
 import sentry_sdk.logger as sentry_logger
 
-from shared import ServerError
-from apps.user_service import Email, EmailInDB, EmailRepository
+from shared.core.exceptions import ServerError
+from apps.user_service.app.api.models.email import Email
+from apps.user_service.app.api.schemas.email import EmailInDB
+from apps.user_service.app.api.repo.email import EmailRepository
 
 
 class EmailService:

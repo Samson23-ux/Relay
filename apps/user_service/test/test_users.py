@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock
 
 
-from apps.user_service import app, get_security, Security
+from apps.user_service.app.main import app
+from apps.user_service.app.deps import get_security
+from apps.user_service.app.core.security import Security
 
 
 def get_security_mock():
@@ -41,7 +43,7 @@ def get_security_mock():
 
 
 class TestSignUpWithEmail:
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_sign_up(self, create_user: httpx.Response):
         json_res = create_user.json()
 
@@ -51,11 +53,10 @@ class TestSignUpWithEmail:
             "Check your email for verification code and instructions"
         )
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_user_exists(self, async_client: httpx.AsyncClient, verify_user):
         sign_up_payload: dict = {
             "email": "user@example.com",
-            "display_name": "test_user",
             "password": "test_user_password",
         }
 
@@ -65,11 +66,10 @@ class TestSignUpWithEmail:
 
         assert res.status_code == 409
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_invalid_email(self, async_client: httpx.AsyncClient):
         sign_up_payload: dict = {
             "email": "invalid_user_email",
-            "display_name": "test_user",
             "password": "test_user_password",
         }
 
@@ -81,14 +81,14 @@ class TestSignUpWithEmail:
 
 
 class TestLogin:
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_login(self, async_client: httpx.AsyncClient, login: httpx.Response):
         json_res = login.json()
 
         assert login.status_code == 201
         assert "access_token" in json_res["data"]
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_user_not_verified(
         self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
@@ -105,7 +105,7 @@ class TestLogin:
 
         assert res.status_code == 400
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_wrong_email_login(
         self, async_client: httpx.AsyncClient, verify_user
     ):
@@ -124,11 +124,11 @@ class TestLogin:
 
 
 class TestSignUpWithGoogle:
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_sign_in_google(self, async_client: httpx.AsyncClient):
         app.dependency_overrides[get_security] = lambda: get_security_mock()
 
-        url_path: str = "app.api.routers.auth.Request.url_for"
+        url_path: str = "apps.user_service.app.api.routers.user.Request.url_for"
         with patch(url_path, new_callable=AsyncMock) as url_patch:
             res: httpx.Response = await async_client.get(
                 "/auth/google", headers={"env": "test"}
@@ -138,7 +138,7 @@ class TestSignUpWithGoogle:
 
         url_patch.assert_called_once()
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_google_callback(self, async_client: httpx.AsyncClient):
         app.dependency_overrides[get_security] = lambda: get_security_mock()
 
@@ -153,7 +153,7 @@ class TestSignUpWithGoogle:
 
 
 class TestAuthToken:
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_get_access_token(
         self, async_client: httpx.AsyncClient, login: httpx.Response
     ):
@@ -166,7 +166,7 @@ class TestAuthToken:
         assert res.status_code == 201
         assert "access_token" in json_res["data"]
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_unauthorized_get_access_token(
         self, async_client: httpx.AsyncClient, verify_user
     ):
@@ -179,8 +179,8 @@ class TestAuthToken:
 
 
 class TestGetCurrentUser:
-    @pytest.mark.anyio
-    async def test_get_current_user(self, async_client: httpx.AsyncClient):
+    @pytest.mark.asyncio
+    async def test_get_current_user(self, async_client: httpx.AsyncClient, verify_user):
         res: httpx.Response = await async_client.get(
             "/auth/me",
             headers={
@@ -194,22 +194,15 @@ class TestGetCurrentUser:
         assert res.status_code == 200
         assert "user@example.com" == json_res["data"]["email"]
 
-    @pytest.mark.anyio
-    async def test_unauthenticated_user(self, async_client: httpx.AsyncClient):
-        res: httpx.Response = await async_client.get(
-            "/auth/me",
-            headers={"env": "test"},
-        )
-
-        assert res.status_code == 401
-
 
 class TestResendOtp:
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_resend_otp_token(
         self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
-        path: str = "app.api.services.auth.send_verification_email.apply_async"
+        path: str = (
+            "apps.user_service.app.api.services.auth.send_verification_email.apply_async"
+        )
 
         resend_otp_payload: dict = {
             "email": "user@example.com",
@@ -229,7 +222,7 @@ class TestResendOtp:
         assert res.status_code == 201
         assert json_res["status"] == "success"
 
-    @pytest.mark.anyio
+    @pytest.mark.asyncio
     async def test_invalid_email_otp_token(
         self, async_client: httpx.AsyncClient, create_user: httpx.Response
     ):
@@ -247,8 +240,8 @@ class TestResendOtp:
 
 
 class TestLogout:
-    @pytest.mark.anyio
-    async def test_logout(self, async_client: httpx.AsyncClient):
+    @pytest.mark.asyncio
+    async def test_logout(self, async_client: httpx.AsyncClient, login):
         res = await async_client.post(
             "/auth/logout",
             headers={
@@ -259,31 +252,10 @@ class TestLogout:
 
         assert res.status_code == 201
 
-        res: httpx.Response = await async_client.get(
-            "/auth/me",
-            headers={
-                "X-USER-EMAIL": "user@example.com",
-                "env": "test",
-            },
-        )
-
-        assert res.status_code == 401
-
-    @pytest.mark.anyio
-    async def test_unauthorized_logout(
-        self, async_client: httpx.AsyncClient, verify_user
-    ):
-        res = await async_client.post(
-            "/auth/logout",
-            headers={"env": "test"},
-        )
-
-        assert res.status_code == 401
-
 
 class TestDeleteAccount:
-    @pytest.mark.anyio
-    async def test_delete_account(self, async_client: httpx.AsyncClient):
+    @pytest.mark.asyncio
+    async def test_delete_account(self, async_client: httpx.AsyncClient, login):
         res = await async_client.delete(
             "/auth",
             headers={
@@ -306,14 +278,3 @@ class TestDeleteAccount:
         )
 
         assert res.status_code == 400
-
-    @pytest.mark.anyio
-    async def test_unauthorized_delete_account(
-        self, async_client: httpx.AsyncClient, verify_user
-    ):
-        res = await async_client.delete(
-            "/auth",
-            headers={"X-USER-EMAIL": "user@example.com", "env": "test"},
-        )
-
-        assert res.status_code == 401

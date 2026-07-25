@@ -1,4 +1,5 @@
-from apps.user_service import OtpInDB, OtpRepository
+from apps.user_service.app.api.schemas.auth import OtpInDB
+from apps.user_service.app.api.repo.otp import OtpRepository
 
 
 class OtpService:

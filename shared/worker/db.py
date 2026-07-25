@@ -6,7 +6,7 @@ from redis.backoff import ExponentialBackoff
 from sqlalchemy.orm import Session, sessionmaker
 from redis.exceptions import TimeoutError, ConnectionError
 
-from shared import get_global_settings
+from shared.core.shared_config import get_global_settings
 
 
 SETTINGS = get_global_settings()

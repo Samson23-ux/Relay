@@ -2,16 +2,14 @@ from fastapi import Depends
 from typing import Annotated
 
 
-from shared import RedisRepo, DBSession
-from apps.user_service import (
-    AuthService,
-    OtpRepository,
-    Security,
-    UserRepository,
-    UserService,
-    EmailRepository,
-    EmailService
-)
+from shared.shared_deps import RedisRepo, DBSession
+from apps.user_service.app.core.security import Security
+from apps.user_service.app.api.repo.otp import OtpRepository
+from apps.user_service.app.api.repo.user import UserRepository
+from apps.user_service.app.api.services.auth import AuthService
+from apps.user_service.app.api.services.user import UserService
+from apps.user_service.app.api.repo.email import EmailRepository
+from apps.user_service.app.api.services.email import EmailService
 
 
 # ------------------- Security dependency ------------------------------ #
@@ -43,10 +41,6 @@ EmailRepo = Annotated[EmailRepository, Depends(get_email_repo)]
 
 
 #  -------------------- Service dependency ---------------------------- #
-
-
-async def get_auth_service(otp_repo: OtpRepo, redis_repo: RedisRepo) -> AuthService:
-    return AuthService(otp_repo=otp_repo, redis_repo=redis_repo)
 
 
 async def get_auth_service(otp_repo: OtpRepo, redis_repo: RedisRepo) -> AuthService:

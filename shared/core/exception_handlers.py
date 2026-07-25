@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 
-from shared import (
-    ServerError,
-    ServiceUnavailable,
-    create_exception_handler,
-)
+
+from shared.core.exceptions import create_exception_handler
+from shared.core.exceptions import ServerError, ServiceUnavailable
 
 
 class GlobalExceptionHandler:
