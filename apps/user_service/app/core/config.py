@@ -7,9 +7,6 @@ class UserSettings(BaseSettings):
         env_file=".env", env_encoding="utf-8", extra="allow", case_sensitive=False,
     )
 
-    # test db
-    USER_TEST_DB_URL: str
-
     # Argon2
     ARGON2_PASSWORD_PEPPER: str
 

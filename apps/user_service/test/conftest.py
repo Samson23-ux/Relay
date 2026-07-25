@@ -30,7 +30,7 @@ from apps.user_service import get_auth_service, AuthService, get_user_settings
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
     async_db_engine: AsyncEngine = create_async_engine(
-        url=get_user_settings().USER_TEST_DB_URL, poolclass=NullPool
+        url=get_global_settings().ASYNC_TEST_DB_URL, poolclass=NullPool
     )
 
     async with async_db_engine.begin() as conn:

@@ -22,6 +22,9 @@ class GlobalSettings(BaseSettings):
     # async db
     ASYNC_DB_URL: str
 
+    # test db
+    ASYNC_TEST_DB_URL: str
+
     # sync db
     SYNC_DB_URL: str
 
