@@ -49,5 +49,5 @@ class GlobalSettings(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def get_settings():
+def get_global_settings():
     return GlobalSettings()
