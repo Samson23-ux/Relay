@@ -5,7 +5,9 @@ description = "A minimalistic API Gateway"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "celery>=5.6.3",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "redis>=8.0.1",
+    "resend>=2.34.0",
 ]

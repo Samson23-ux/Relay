@@ -26,6 +26,7 @@ from apps.user_service import (
     EmailUserResponse,
     GoogleUserResponse,
     AuthenticationError,
+    send_verification_email
 )
 
 
