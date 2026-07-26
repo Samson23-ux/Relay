@@ -353,16 +353,14 @@ class AuthService:
         return access_token, refresh_token
 
     async def get_current_user(
-        self, user_email: UUID, user_service: UserService
+        self, curr_user: User
     ) -> EmailUserResponse | GoogleUserResponse:
-        user: User | None = await user_service.get_user_by_email(email=user_email)
-
-        if user.type == "email":
-            user_email: str = user.email
-            user = EmailUserResponse.model_validate(user)
+        if curr_user.type == "email":
+            user_email: str = curr_user.email
+            user = EmailUserResponse.model_validate(curr_user)
         else:
-            user_email: str = user.google_email
-            user = GoogleUserResponse.model_validate(user)
+            user_email: str = curr_user.google_email
+            user = GoogleUserResponse.model_validate(curr_user)
 
         sentry_logger.info(
             "User {email} account retrieved",
@@ -372,18 +370,16 @@ class AuthService:
 
     async def logout(
         self,
-        user_email: str,
+        curr_user: User,
         refresh_token: str,
         security: Security,
         user_service: UserService,
     ):
-        user: User | None = await user_service.get_user_by_email(email=user_email)
-        user_email: str = get_user_email(user)
-
+        user_email: str = get_user_email(curr_user)
         _ = await self._revoke_refresh_token(refresh_token, security)
 
-        user.is_active = False
-        await user_service.update_user(user)
+        curr_user.is_active = False
+        await user_service.update_user(curr_user)
 
         sentry_logger.info(
             "User {email} account logout completed",
@@ -392,15 +388,14 @@ class AuthService:
 
     async def delete_account(
         self,
-        user_email: str,
+        curr_user: User,
         refresh_token: str,
         security: Security,
         user_service: UserService,
     ):
-        user: User | None = await user_service.get_user_by_email(email=user_email)
-        user_email: str = get_user_email(user)
+        user_email: str = get_user_email(curr_user)
 
-        await user_service.delete_user(user)
+        await user_service.delete_user(curr_user)
         _ = await self._revoke_refresh_token(refresh_token, security)
 
         sentry_logger.info(

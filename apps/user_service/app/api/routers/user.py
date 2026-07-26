@@ -2,10 +2,10 @@ from fastapi.responses import RedirectResponse
 from fastapi import APIRouter, Request, Response
 
 
-from shared.shared_deps import UnitOfWorkRepo
 from apps.user_service.app.deps import SecurityDep
 from shared.schemas.response import SuccessResponse
 from shared.core.shared_config import get_global_settings
+from shared.shared_deps import UnitOfWorkRepo, CurrUserDep
 from apps.user_service.app.core.config import get_user_settings
 from apps.user_service.app.deps import AuthServiceDep, UserServiceDep, EmailServiceDep
 from apps.user_service.app.api.schemas.user import EmailUserResponse, GoogleUserResponse
@@ -17,7 +17,7 @@ from apps.user_service.app.api.schemas.auth import (
     EmailSignUp,
     SignUpResponse,
     LogoutResponse,
-    OtpResendResponse
+    OtpResendResponse,
 )
 
 router = APIRouter()
@@ -205,12 +205,11 @@ async def create_new_token(
 )
 async def get_current_user(
     request: Request,
-    user_service: UserServiceDep,
+    curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
 ):
-    user_email = request.headers.get("X-USER-EMAIL")
     user: EmailUserResponse | GoogleUserResponse = await auth_service.get_current_user(
-        user_email, user_service
+        curr_user
     )
     return SuccessResponse(message="User retrieved successfully", data=user)
 
@@ -224,12 +223,12 @@ async def get_current_user(
 async def log_out(
     request: Request,
     security: SecurityDep,
+    curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
 ):
-    user_email: str = request.headers.get("X-USER-EMAIL")
     refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.logout(user_email, refresh_token, security, user_service)
+    await auth_service.logout(curr_user, refresh_token, security, user_service)
     return SuccessResponse(message="Log out completed successfully")
 
 
@@ -237,9 +236,9 @@ async def log_out(
 async def delete_account(
     request: Request,
     security: SecurityDep,
+    curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
 ):
-    user_email: str = request.headers.get("X-USER-EMAIL")
     refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.delete_account(user_email, refresh_token, security, user_service)
+    await auth_service.delete_account(curr_user, refresh_token, security, user_service)

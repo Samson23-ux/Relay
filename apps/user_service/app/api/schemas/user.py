@@ -1,5 +1,6 @@
 from uuid import UUID
 from typing import Optional
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 
@@ -26,6 +27,11 @@ class EmailUser(UserBase):
 
 class UserInDB(GoogleUser, EmailUser):
     hashed_password: Optional[str] = None
+
+
+class CurrentUser(UserInDB):
+    id: UUID
+    created_at: datetime
 
 
 class GoogleUserResponse(GoogleUser):

@@ -184,8 +184,9 @@ class TestGetCurrentUser:
         res: httpx.Response = await async_client.get(
             "/auth/me",
             headers={
-                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
+                "X-USER-TYPE": "email",
+                "X-USER-EMAIL": "user@example.com",
             },
         )
 
@@ -245,8 +246,9 @@ class TestLogout:
         res = await async_client.post(
             "/auth/logout",
             headers={
-                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
+                "X-USER-TYPE": "email",
+                "X-USER-EMAIL": "user@example.com",
             },
         )
 
@@ -259,8 +261,9 @@ class TestDeleteAccount:
         res = await async_client.delete(
             "/auth",
             headers={
-                "X-USER-EMAIL": "user@example.com",
                 "env": "test",
+                "X-USER-TYPE": "email",
+                "X-USER-EMAIL": "user@example.com",
             },
         )
 
