@@ -9,8 +9,7 @@ from apps.user_service.app.api.schemas.email import EmailBase
 class EmailRepository(BaseRepository[EmailBase, Email]):
     model = Email
 
-    @staticmethod
-    def _entity_to_model(entity: EmailBase) -> Email:
+    def _entity_to_model(self, entity: EmailBase) -> Email:
         return Email(**entity.model_dump())
 
     def _get_filters(self, **filters) -> list[Any]:
@@ -19,3 +18,6 @@ class EmailRepository(BaseRepository[EmailBase, Email]):
         if "id" in filters:
             filter_conditions.append(self.model.id == filters["id"])
         return filter_conditions
+
+    def _get_sort_fields(self, sort):
+        return super()._get_sort_fields(sort)

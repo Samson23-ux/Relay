@@ -138,6 +138,10 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
     def _get_filters(self, **filters) -> list[Any]:
         return []
 
+    @abstractmethod
+    def _get_sort_fields(self, sort: str) -> list[Any]:
+        return []
+
     # sync db queries
     def get_sync_records(self, **filters) -> Sequence[SqlalchemyModel]:
         filter_conditions: list[Any] = self._get_filters(**filters)

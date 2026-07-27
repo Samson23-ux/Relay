@@ -26,5 +26,5 @@ class OtpRepository(BaseRepository[AuthBase, Otp]):
 
         return filter_conditions
 
-    def _get_sort_fields(self, sort: str) -> list[Any]:
-        pass
+    def _get_sort_fields(self, sort):
+        return super()._get_sort_fields(sort)
