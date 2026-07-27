@@ -37,6 +37,9 @@ class GlobalSettings(BaseSettings):
     # rabbitmq
     BROKER_URL: str
 
+    # idempotency
+    IDEMPOTENCY_KEY_TTL: int = 60 * 60 * 24
+
     # resend email
     API_EMAIL: str
     RESEND_API_KEY: str

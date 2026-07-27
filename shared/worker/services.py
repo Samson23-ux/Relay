@@ -1,6 +1,14 @@
+from shared.repo.log import LogRepository
+from shared.services.log import LogService
 from shared.repo.redis import RedisRepository
-from shared.shared_deps import get_redis_client
+from shared.worker.db import get_db_session, get_redis_client
 
 
 def get_redis_repo() -> RedisRepository:
-    return RedisRepository(sync_redis=get_redis_client())
+    redis = next(get_redis_client())
+    return RedisRepository(sync_redis=redis)
+
+
+def get_log_service() -> LogService:
+    session = next(get_db_session())
+    return LogService(log_repo=LogRepository(sync_session=session))

@@ -6,8 +6,8 @@ from resend.exceptions import ResendError
 from datetime import datetime, timezone, timedelta
 
 
-from shared.core.exceptions import MaxRetriesError
 from shared.worker.services import get_redis_repo
+from shared.core.exceptions import MaxRetriesError
 from shared.worker.tasks.base import BaseTaskWithFailure
 from apps.user_service.app.api.models.email import Email
 from shared.core.shared_config import get_global_settings
@@ -80,7 +80,7 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
         email_service = get_email_service()
 
         key: str = f"idempotency:{email_id}"
-        already_processed: str | None = redis_repo.get_processed_email(key)
+        already_processed: str | None = redis_repo.sync_get_key(key)
 
         if not already_processed:
             otp: str = str(secrets.randbelow(900000) + 100000)
@@ -93,7 +93,7 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
                 verification_message(otp),
             )
 
-            redis_repo.mark_email_processed(key, "1", USER_SETTINGS.IDEMPOTENCY_KEY_TTL)
+            redis_repo.mark_task_processed(key, "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL)
 
             email: Email = email_service.get_processed_email(email_id)
             email.status = "delivered"
@@ -129,10 +129,5 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
             self._handle_failure(self.request.kwargs)
             raise Reject(exc, requeue=False)
     except Exception as exc:
-        """Update state and reject manaully to send to dlq for non-transient errors"""
         self._handle_failure(self.request.kwargs)
         raise Reject(exc, requeue=False)
-    finally:
-        otp_service._otp_repo.close()
-        redis_repo._sync_redis.close()
-        email_service._email_repo.close()

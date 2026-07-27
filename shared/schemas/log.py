@@ -20,5 +20,12 @@ class LogCreate(LogBase):
     upstream_url: str
     method: str
     path: str
-    circuit_open: Optional[bool] = None
+    circuit_open: bool = False
+    rate_limited: bool = False
+
+
+class LogUpdate(LogBase):
+    retries: Optional[int] = None
+    latency_ms: Optional[int] = None
+    status_code: Optional[int] = None
     rate_limited: Optional[bool] = None

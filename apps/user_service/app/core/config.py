@@ -27,9 +27,6 @@ class UserSettings(BaseSettings):
     # session middleware
     SESSION_SECRET_KEY: str
 
-    # notification
-    IDEMPOTENCY_KEY_TTL: int = 60 * 60 * 24
-
     # otp
     OTP_EXPIRE_TIME: int = 15
 

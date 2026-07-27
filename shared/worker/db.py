@@ -1,5 +1,7 @@
+from typing import Any
 from redis import Redis
 from redis.retry import Retry
+from collections.abc import Generator
 from redis.connection import ConnectionPool
 from sqlalchemy import Engine, create_engine
 from redis.backoff import ExponentialBackoff
@@ -20,7 +22,7 @@ db_engine: Engine = create_engine(
     connect_args={"options": "-c timezone=utc"},
 )
 
-db_session: Session = sessionmaker(bind=db_engine, autocommit=False, autoflush=False)
+db_session = sessionmaker(bind=db_engine, autocommit=False, autoflush=False)
 
 redis_pool = ConnectionPool.from_url(
     SETTINGS.REDIS_URL,
@@ -32,10 +34,11 @@ redis_pool = ConnectionPool.from_url(
 )
 
 
-def get_db_session() -> Session:
-    return db_session()
+def get_db_session() -> Generator[Session, Any, None]:
+    with db_session() as session:
+        yield session
 
 
-def get_redis_client() -> Redis:
-    redis = Redis(connection_pool=redis_pool)
-    return redis
+def get_redis_client() -> Generator[Redis, Any, None]:
+    with Redis(connection_pool=redis_pool) as redis:
+        yield redis

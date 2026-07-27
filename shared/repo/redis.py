@@ -15,3 +15,11 @@ class RedisRepository:
 
     async def delete_key(self, key: str):
         await self._async_redis.delete(key)
+
+    # sync
+
+    def sync_get_key(self, key: str) -> str | None:
+        return self._sync_redis.get(key)
+
+    def mark_task_processed(self, key: str, value: str, ttl: int):
+        self._sync_redis.set(key, value, ex=ttl)
