@@ -13,7 +13,7 @@ from sqlalchemy import (
     Enum,
 )
 
-from apps.user_service.app.api.models.base import Base
+from shared.models.base import Base
 
 
 class UserType(str, enum.Enum):

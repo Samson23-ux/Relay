@@ -7,15 +7,16 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from apps.user_service.app.api.models.base import Base
-from shared.core.shared_config import get_global_settings
-from apps.user_service.app.api import models  # noqa:  F401
 
-db_url: str = get_global_settings().ASYNC_DB_URL
+from shared.models.base import Base
+from shared.core.shared_config import get_global_settings
+from apps.user_service.app.api import models as usermodels  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+db_url: str = get_global_settings().ASYNC_DB_URL
 
 if not db_url:
     raise ValueError("Database url not set")

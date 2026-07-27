@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import DateTime, PrimaryKeyConstraint, UUID, String, Enum
 
-from apps.user_service.app.api.models.base import Base
+from shared.models.base import Base
 
 
 class EmailStatus(str, enum.Enum):
