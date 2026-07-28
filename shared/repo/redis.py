@@ -20,6 +20,9 @@ class RedisRepository:
 
     def sync_get_key(self, key: str) -> str | None:
         return self._sync_redis.get(key)
+    
+    def sync_get_hset(self, key: str) -> dict:
+        return self._sync_redis.hgetall(key)
 
     def mark_task_processed(self, key: str, value: str, ttl: int):
         self._sync_redis.set(key, value, ex=ttl)

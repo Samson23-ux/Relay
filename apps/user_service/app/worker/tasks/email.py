@@ -73,7 +73,14 @@ def verification_message(otp: str):
 
 
 @celery_app.task(base=BaseTaskWithFailure, bind=True)
-def send_verification_email(self, email_id: UUID, recipient_email: str, user_id: UUID):
+def send_verification_email(
+    self,
+    circuit_key: str,
+    request_meta: dict,
+    email_id: UUID,
+    recipient_email: str,
+    user_id: UUID,
+):
     try:
         redis_repo = get_redis_repo()
         otp_service = get_otp_service()
@@ -93,12 +100,14 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
                 verification_message(otp),
             )
 
-            redis_repo.mark_task_processed(key, "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL)
+            redis_repo.mark_task_processed(
+                key, "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL
+            )
 
             email: Email = email_service.get_processed_email(email_id)
             email.status = "delivered"
             email.delivered_at = datetime.now(timezone.utc)
-            email_service.update_processed_email(email)
+            email_service.update_processed_email(circuit_key, request_meta, email)
 
             otp_payload: OtpInDB = OtpInDB(
                 otp=otp,

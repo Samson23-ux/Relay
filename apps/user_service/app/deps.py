@@ -47,12 +47,12 @@ async def get_auth_service(otp_repo: OtpRepo, redis_repo: RedisRepo) -> AuthServ
     return AuthService(otp_repo=otp_repo, redis_repo=redis_repo)
 
 
-async def get_user_service(user_repo: UserRepo) -> UserService:
-    return UserService(user_repo=user_repo)
+async def get_user_service(user_repo: UserRepo, redis: RedisRepo) -> UserService:
+    return UserService(user_repo=user_repo, redis_repo=redis)
 
 
-async def get_email_service(email_repo: EmailRepo) -> EmailService:
-    return EmailService(email_repo=email_repo)
+async def get_email_service(email_repo: EmailRepo, redis_repo: RedisRepo) -> EmailService:
+    return EmailService(email_repo=email_repo, redis_repo=redis_repo)
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]

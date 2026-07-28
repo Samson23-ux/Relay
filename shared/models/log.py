@@ -28,6 +28,12 @@ class UpstreamType(str, enum.Enum):
     PRODUCT_SERVICE = "product_service"
 
 
+class LogLevel(str, enum.Enum):
+    INFO = "info"
+    DEBUG = "debug"
+    ERROR = "error"
+
+
 class Log(Base):
     __tablename__ = "logs"
 
@@ -37,7 +43,7 @@ class Log(Base):
     trace_id: Mapped[uuid.UUID] = mapped_column(UUID)
     span_id: Mapped[uuid.UUID] = mapped_column(UUID)
     parent_span_id: Mapped[uuid.UUID | None] = mapped_column(UUID)
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID, ForeignKey("users.id", name="logs_user_id_fk", ondelete="CASCADE")
     )
     client_ip: Mapped[str] = mapped_column(INET)
@@ -45,6 +51,11 @@ class Log(Base):
         Enum(UpstreamType, values_callable=lambda e: [m.value for m in e])
     )
     upstream_url: Mapped[str | None] = mapped_column(String)
+    message: Mapped[str] = mapped_column(String)
+    log_level: Mapped[enum.Enum] = mapped_column(
+        Enum(LogLevel, values_callable=lambda e: [m.value for m in e]),
+        default=LogLevel.INFO
+    )
     method: Mapped[str] = mapped_column(String)
     path: Mapped[str] = mapped_column(String)
     status_code: Mapped[int | None] = mapped_column(Integer)

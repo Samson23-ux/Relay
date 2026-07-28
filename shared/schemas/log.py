@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-from shared.models.log import UpstreamType
+from shared.models.log import UpstreamType, LogLevel
 
 
 class LogBase(BaseModel):
@@ -14,10 +14,12 @@ class LogCreate(LogBase):
     trace_id: UUID
     span_id: UUID
     parent_span_id: Optional[UUID] = None
-    user_id: UUID
+    user_id: Optional[UUID] = None
     client_ip: str
     upstream: UpstreamType
     upstream_url: str
+    message: str
+    log_level: LogLevel = LogLevel.INFO
     method: str
     path: str
     circuit_open: bool = False

@@ -40,24 +40,50 @@ RedisRepo = Annotated[RedisRepository, Depends(get_redis_repo)]
 UnitOfWorkRepo = Annotated[UnitOfWorkRepository, Depends(get_unit_of_work)]
 
 
+# --------------------- Request metadata ---------------------------- #
+
+
+async def request_metadata(request: Request) -> dict:
+    return {
+        "trace_id": request.headers.get("x-trace-id"),
+        "span_id": request.state.span_id,  # set by a middleware layer
+        "parent_span_id": request.state.parent_span_id,  # set by a middleware layer
+        "client_ip": request.headers.get("x-forwarded-for").split(",")[-1],
+        "upstream": request.headers.get("x-upstream"),
+        "upstream_url": request.url,
+        "method": request.method,
+        "path": request.url.path,
+    }
+
+
+RequestMetaData = Annotated[dict, Depends(request_metadata)]
+
+
 # -------------------- Current user dependency ---------------------- #
 
 
-async def get_current_user(request: Request, session: DBSession) -> User:
+async def get_current_user(
+    request: Request,
+    redis: RedisRepo,
+    session: DBSession,
+    request_meta: RequestMetaData,
+) -> User:
+    circuit_key: str = f"circuit:{request_meta.get("upstream")}"
     user_service = UserService(
+        redis_repo=redis,
         user_repo=UserRepository(async_session=session),
     )
 
-    user_type: str = request.headers.get("X-USER-TYPE")
-    user_email: str = request.headers.get("X-USER-EMAIL")
+    user_type: str = request.headers.get("x-user-type")
+    user_email: str = request.headers.get("x-user-email")
 
     if user_type == "email":
         curr_user: User = await user_service.get_user_by_email(
-            email=user_email, is_verified=True
+            circuit_key, request_meta, email=user_email, is_verified=True
         )
     else:
         curr_user: User = await user_service.get_user_by_email(
-            google_email=user_email, is_verified=True
+            circuit_key, request_meta, email=user_email, is_verified=True
         )
 
     return curr_user

@@ -1,8 +1,7 @@
-import sentry_sdk
 from uuid import UUID, uuid7
-import sentry_sdk.logger as sentry_logger
 
 
+from shared.worker.tasks.log import save_log
 from shared.repo.redis import RedisRepository
 from shared.core.exceptions import ServerError
 from shared.repo.uow import UnitOfWorkRepository
@@ -45,7 +44,14 @@ class AuthService:
 
     SETTINGS = get_user_settings()
 
-    async def _get_tokens(self, email: str, user_type: str, security: Security):
+    async def _get_tokens(
+        self,
+        email: str,
+        user_type: str,
+        circuit_key: str,
+        request_meta: dict,
+        security: Security,
+    ):
         token_data: TokenData = TokenData(email=email, user_type=user_type)
         access_token, refresh_token_payload = await security.prepare_tokens(token_data)
 
@@ -54,22 +60,40 @@ class AuthService:
 
         try:
             await self._redis_repo.create_hset(key, refresh_token_payload)
+            return access_token, refresh_token_payload.get("refresh_token")
         except Exception as e:
-            sentry_sdk.capture_exception(e)
-            sentry_logger.error("Error occurred while saving refresh token to redis")
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
+                "Error occurred while saving refresh token to redis"
+            )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise ServerError() from e
 
-        return access_token, refresh_token_payload.get("refresh_token")
-
     async def _revoke_refresh_token(
-        self, refresh_token: str, security: Security
+        self,
+        circuit_key: str,
+        request_meta: dict,
+        refresh_token: str,
+        security: Security,
     ) -> tuple:
         refresh_token: dict = await security.decode_token(
             refresh_token, self.SETTINGS.REFRESH_TOKEN_SECRET_KEY
         )
 
         if not refresh_token:
-            sentry_logger.error("Inavlid refresh token received during refresh")
+            request_meta["log_level"] = "error"
+            request_meta["message"] = "Inavlid refresh token received during refresh"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise AuthenticationError()
 
         refresh_token_id: str = refresh_token["jti"]
@@ -78,7 +102,14 @@ class AuthService:
         refresh_token_db: dict = await self._redis_repo.get_hset(key)
 
         if not refresh_token_db:
-            sentry_logger.error("Inavlid refresh token received during refresh")
+            request_meta["log_level"] = "error"
+            request_meta["message"] = "Inavlid refresh token received during refresh"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise AuthenticationError()
 
         user_email: str = refresh_token_db["email"]
@@ -86,17 +117,23 @@ class AuthService:
 
         try:
             await self._redis_repo.delete_key(key)
+            return user_email, user_type
         except Exception as e:
-            sentry_sdk.capture_exception(e)
-            sentry_logger.error(
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
                 "Error occurred while deleting refresh token from redis"
             )
-            raise ServerError() from e
 
-        return user_email, user_type
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
+            raise ServerError() from e
 
     async def sign_up_with_email(
         self,
+        request_meta: dict,
         email_login: EmailLogin,
         user_service: UserService,
         email_service: EmailService,
@@ -106,6 +143,8 @@ class AuthService:
         user_email: str = email_login.email
         hashed_password: str = await security.hash_password(email_login.password)
 
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email
         )
@@ -113,53 +152,75 @@ class AuthService:
         if existing_user:
             if not existing_user.is_verified:
                 existing_user.hashed_password = hashed_password
-                await user_service.update_user(existing_user)
+                await user_service.update_user(circuit_key, request_meta, existing_user)
 
                 email_db: EmailInDB = EmailInDB(
                     id=email_id, processed_email=existing_user.email
                 )
-                await email_service.create_email(email_db)
+                await email_service.create_email(circuit_key, request_meta, email_db)
 
                 send_verification_email.apply_async(
                     priority=5,
                     kwargs={
+                        "circuit_key": circuit_key,
+                        "request_meta": request_meta,
                         "email_id": email_id,
                         "recipient_email": existing_user.email,
                         "user_id": str(existing_user.id),
                     },
                 )
             else:
-                sentry_logger.error("User exists with email {email}", email=user_email)
+                request_meta["log_level"] = "error"
+                request_meta["message"] = f"User exists with email {user_email}"
+
+                circuit: dict = await self._redis_repo.get_hset(circuit_key)
+                circuit_state = circuit.get("state")
+                request_meta["circuit_open"] = (
+                    True if circuit_state == "open" else False
+                )
+
+                save_log.apply_async(priority=3, kwargs=request_meta)
                 raise UserExistsError(user_email=user_email)
         else:
             user = UserInDB(
                 email=user_email, hashed_password=hashed_password, type="email"
             )
-            await user_service.create_user(user, user_email)
+            await user_service.create_user(circuit_key, request_meta, user, user_email)
 
             user: User | None = await user_service._get_user_by_email(email=user_email)
 
             email_db: EmailInDB = EmailInDB(id=email_id, processed_email=user_email)
-            await email_service.create_email(email_db)
+            await email_service.create_email(circuit_key, request_meta, email_db)
 
             send_verification_email.apply_async(
                 priority=5,
                 kwargs={
+                    "circuit_key": circuit_key,
+                    "request_meta": request_meta,
                     "email_id": email_id,
                     "recipient_email": user_email,
                     "user_id": str(user.id),
                 },
             )
-
-        sentry_logger.info(
-            "Email and password sign up completed for user {email}",
-            email=user_email,
+        request_meta["message"] = (
+            f"Email and password sign up completed for user {user_email}"
         )
 
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
+
     async def sign_up_with_google(
-        self, payload: dict, user_service: UserService, security: Security
+        self,
+        request_meta: dict,
+        payload: dict,
+        user_service: UserService,
+        security: Security,
     ) -> tuple[str]:
         user_info: dict = payload.get("userinfo")
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
         google_id: str = user_info.get("sub")
         user_email: str = user_info.get("email")
@@ -171,7 +232,7 @@ class AuthService:
 
         if existing_user:
             existing_user.is_active = True
-            await user_service.update_user(existing_user)
+            await user_service.update_user(circuit_key, request_meta, existing_user)
         else:
             user = UserInDB(
                 type="google",
@@ -180,26 +241,32 @@ class AuthService:
                 google_id=google_id,
                 google_email=user_email,
             )
-            await user_service.create_user(user, user_email)
+            await user_service.create_user(circuit_key, request_meta, user, user_email)
 
         access_token, refresh_token = await self._get_tokens(
-            user_email, "google", security
+            user_email, "google", circuit_key, request_meta, security
         )
 
-        sentry_logger.info(
-            "Google sign in completed for user {email}",
-            email=user_email,
-        )
+        request_meta["message"] = f"Google sign in completed for user {user_email}"
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
 
         return access_token, refresh_token
 
     async def verify_account(
         self,
+        request_meta: dict,
         uow: UnitOfWorkRepository,
         email_verify: EmailVerify,
     ):
         # close active sessions
         await self._otp_repo.aclose()
+
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
         self._uow = uow
         self._user_repo = UserRepository(self._uow._session)
@@ -210,7 +277,14 @@ class AuthService:
         existing_user: User | None = await self._user_repo.get_record(email=user_email)
 
         if not existing_user:
-            sentry_logger.error("User not found with email {email}", email=user_email)
+            request_meta["log_level"] = "error"
+            request_meta["message"] = f"User not found with email {user_email}"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise InvalidOtpError()
 
         otp: Otp = await self._otp_repo.get_record(
@@ -221,9 +295,14 @@ class AuthService:
         )
 
         if not otp:
-            sentry_logger.error(
-                "Invalid otp received from user {email}", email=user_email
-            )
+            request_meta["log_level"] = "error"
+            request_meta["message"] = f"Invalid otp received from user {user_email}"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise InvalidOtpError()
 
         try:
@@ -235,34 +314,53 @@ class AuthService:
 
             await self._uow.commit()
 
-            sentry_logger.info(
-                "User {email} account verification completed",
-                email=user_email,
+            request_meta["message"] = (
+                f"User {user_email} account verification completed"
             )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
         except Exception as e:
             await self._uow.rollback()
 
-            sentry_sdk.capture_exception(e)
-            sentry_logger.error(
-                "Error occured while trying to verify user {email} account",
-                email=user_email,
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
+                f"Error occured while trying to verify user {user_email} account"
             )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise ServerError() from e
 
     async def resend_otp(
         self,
+        request_meta: dict,
         otp_resend: ResendOtp,
         user_service: UserService,
         email_service: EmailService,
     ):
         user_email: str = otp_resend.email
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email, is_verified=False
         )
 
         if not existing_user:
-            sentry_logger.error("User with email {email} not found", email=user_email)
+            request_meta["log_level"] = "error"
+            request_meta["message"] = f"User with email {user_email} not found"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise CredentialError()
 
         try:
@@ -275,86 +373,128 @@ class AuthService:
             email_db: EmailInDB = EmailInDB(
                 id=email_id, processed_email=existing_user.email
             )
-            await email_service.create_email(email_db)
+            await email_service.create_email(circuit_key, request_meta, email_db)
 
             send_verification_email.apply_async(
                 priority=5,
                 kwargs={
+                    "circuit_key": circuit_key,
+                    "request_meta": request_meta,
                     "email_id": email_id,
                     "recipient_email": user_email,
                     "user_id": str(existing_user.id),
                 },
             )
 
-            sentry_logger.info(
-                "OTP code resent to user {email}",
-                email=user_email,
-            )
+            request_meta["message"] = f"OTP code resent to user {user_email}"
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
         except Exception as e:
             await self._otp_repo.rollback()
 
-            sentry_sdk.capture_exception(e)
-            sentry_logger.error(
-                "Error occured while resending otp to user {email}",
-                email=user_email,
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
+                f"Error occured while resending otp to user {user_email}"
             )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise ServerError() from e
 
     async def login(
-        self, email_login: EmailLogin, user_service: UserService, security: Security
+        self,
+        request_meta: dict,
+        email_login: EmailLogin,
+        user_service: UserService,
+        security: Security,
     ):
         user_email: str = email_login.email
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email, is_verified=True, is_deactivated=False
         )
 
         if not existing_user:
-            sentry_logger.error(
-                "Invalid credentials received from user {email}", email=user_email
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
+                f"Invalid credentials received from user {user_email}"
             )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise CredentialError()
 
         if not await security.verify_password(
             email_login.password, existing_user.hashed_password
         ):
-            sentry_logger.error(
-                "Invalid credentials received from user {email}", email=user_email
+            request_meta["log_level"] = "error"
+            request_meta["message"] = (
+                f"Invalid credentials received from user {user_email}"
             )
+
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            circuit_state = circuit.get("state")
+            request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+            save_log.apply_async(priority=3, kwargs=request_meta)
             raise CredentialError()
 
         existing_user.is_active = True
-        await user_service.update_user(existing_user)
+        await user_service.update_user(circuit_key, request_meta, existing_user)
 
         access_token, refresh_token = await self._get_tokens(
-            user_email, "email", security
+            user_email, "email", circuit_key, request_meta, security
         )
 
-        sentry_logger.info(
-            "Login completed for user {email}",
-            email=user_email,
-        )
+        request_meta["message"] = f"Login completed for user {user_email}"
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
 
         return access_token, refresh_token
 
-    async def create_auth_tokens(self, refresh_token: str, security: Security):
+    async def create_auth_tokens(
+        self, request_meta: dict, refresh_token: str, security: Security
+    ):
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
         user_email, user_type = await self._revoke_refresh_token(
-            refresh_token, security
+            circuit_key, request_meta, refresh_token, security
         )
         access_token, refresh_token = await self._get_tokens(
-            user_email, user_type, security
+            user_email, user_type, circuit_key, request_meta, security
         )
 
-        sentry_logger.info(
-            "Access and refresh tokens created for user {email}",
-            email=user_email,
+        request_meta["message"] = (
+            f"Access and refresh tokens created for user {user_email}"
         )
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
 
         return access_token, refresh_token
 
     async def get_current_user(
-        self, curr_user: User
+        self, request_meta: dict, curr_user: User
     ) -> EmailUserResponse | GoogleUserResponse:
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+
         if curr_user.type == "email":
             user_email: str = curr_user.email
             user = EmailUserResponse.model_validate(curr_user)
@@ -362,43 +502,58 @@ class AuthService:
             user_email: str = curr_user.google_email
             user = GoogleUserResponse.model_validate(curr_user)
 
-        sentry_logger.info(
-            "User {email} account retrieved",
-            email=user_email,
-        )
+        request_meta["message"] = f"User {user_email} account retrieved"
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
+
         return user
 
     async def logout(
         self,
+        request_meta: dict,
         curr_user: User,
         refresh_token: str,
         security: Security,
         user_service: UserService,
     ):
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+
         user_email: str = get_user_email(curr_user)
-        _ = await self._revoke_refresh_token(refresh_token, security)
+        _ = await self._revoke_refresh_token(circuit_key, request_meta, refresh_token, security)
 
         curr_user.is_active = False
-        await user_service.update_user(curr_user)
+        await user_service.update_user(circuit_key, request_meta, curr_user)
 
-        sentry_logger.info(
-            "User {email} account logout completed",
-            email=user_email,
-        )
+        request_meta["message"] = f"User {user_email} account logout completed"
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)
 
     async def delete_account(
         self,
+        request_meta: dict,
         curr_user: User,
         refresh_token: str,
         security: Security,
         user_service: UserService,
     ):
         user_email: str = get_user_email(curr_user)
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
-        await user_service.delete_user(curr_user)
-        _ = await self._revoke_refresh_token(refresh_token, security)
+        await user_service.delete_user(circuit_key, request_meta, curr_user)
+        _ = await self._revoke_refresh_token(circuit_key, request_meta, refresh_token, security)
 
-        sentry_logger.info(
-            "User {email} account deleted",
-            email=user_email,
-        )
+        request_meta["message"] = f"User {user_email} account deleted"
+
+        circuit: dict = await self._redis_repo.get_hset(circuit_key)
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+        save_log.apply_async(priority=3, kwargs=request_meta)

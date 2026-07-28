@@ -20,13 +20,13 @@ from sqlalchemy.ext.asyncio import (
 from shared.models.base import Base
 from apps.user_service.app.main import app
 from shared.repo.redis import RedisRepository
-from shared.shared_deps import get_redis_client
 from apps.user_service.app.api.models.otp import Otp
 from shared.database.shared_session import get_session
 from apps.user_service.app.deps import get_auth_service
 from shared.core.shared_config import get_global_settings
 from apps.user_service.app.api import models  # noqa: F401
 from apps.user_service.app.api.services.auth import AuthService
+from shared.shared_deps import get_redis_client, request_metadata
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -116,6 +116,7 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
     app.dependency_overrides[get_session] = get_test_session
     app.dependency_overrides[get_redis_client] = lambda: test_redis_client
+    app.dependency_overrides[request_metadata] = lambda: {"upstream": "test"}
 
     async with LifespanManager(app):
         async with AsyncClient(

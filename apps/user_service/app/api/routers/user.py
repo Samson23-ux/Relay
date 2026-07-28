@@ -5,8 +5,8 @@ from fastapi import APIRouter, Request, Response
 from apps.user_service.app.deps import SecurityDep
 from shared.schemas.response import SuccessResponse
 from shared.core.shared_config import get_global_settings
-from shared.shared_deps import UnitOfWorkRepo, CurrUserDep
 from apps.user_service.app.core.config import get_user_settings
+from shared.shared_deps import UnitOfWorkRepo, CurrUserDep, RequestMetaData
 from apps.user_service.app.deps import AuthServiceDep, UserServiceDep, EmailServiceDep
 from apps.user_service.app.api.schemas.user import EmailUserResponse, GoogleUserResponse
 from apps.user_service.app.api.schemas.auth import (
@@ -42,10 +42,11 @@ async def sign_up_with_email(
     email_login: EmailSignUp,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
     email_service: EmailServiceDep,
 ):
     await auth_service.sign_up_with_email(
-        email_login, user_service, email_service, security
+        request_meta, email_login, user_service, email_service, security
     )
     return SuccessResponse(
         message=(
@@ -79,11 +80,12 @@ async def google_callback(
     security: SecurityDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
 ):
     await security.register_oauth()
     payload: dict = await security.oauth.google.authorize_access_token(request)
     access_token, refresh_token = await auth_service.sign_up_with_google(
-        payload, user_service, security
+        request_meta, payload, user_service, security
     )
 
     expire_time: int = USER_SETTINGS.REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
@@ -110,8 +112,9 @@ async def verify_account(
     uow: UnitOfWorkRepo,
     email_verify: EmailVerify,
     auth_service: AuthServiceDep,
+    request_meta: RequestMetaData,
 ):
-    await auth_service.verify_account(uow, email_verify)
+    await auth_service.verify_account(request_meta, uow, email_verify)
     return SuccessResponse(message="User email verified successfully")
 
 
@@ -126,9 +129,10 @@ async def resend_otp(
     otp_resend: ResendOtp,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
     email_service: EmailServiceDep,
 ):
-    await auth_service.resend_otp(otp_resend, user_service, email_service)
+    await auth_service.resend_otp(request_meta, otp_resend, user_service, email_service)
     return SuccessResponse(
         message="OTP sent successfully. Check your email for instructions"
     )
@@ -147,9 +151,10 @@ async def login(
     email_login: EmailLogin,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
 ):
     access_token, refresh_token = await auth_service.login(
-        email_login, user_service, security
+        request_meta, email_login, user_service, security
     )
 
     expire_time: int = USER_SETTINGS.REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
@@ -177,10 +182,11 @@ async def create_new_token(
     response: Response,
     security: SecurityDep,
     auth_service: AuthServiceDep,
+    request_meta: RequestMetaData,
 ):
     refresh_token: str = request.cookies.get("refresh_token")
     access_token, refresh_token = await auth_service.create_auth_tokens(
-        refresh_token, security
+        request_meta, refresh_token, security
     )
 
     expire_time: int = USER_SETTINGS.REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
@@ -207,9 +213,10 @@ async def get_current_user(
     request: Request,
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
+    request_meta: RequestMetaData,
 ):
     user: EmailUserResponse | GoogleUserResponse = await auth_service.get_current_user(
-        curr_user
+        request_meta, curr_user
     )
     return SuccessResponse(message="User retrieved successfully", data=user)
 
@@ -226,9 +233,12 @@ async def log_out(
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
 ):
     refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.logout(curr_user, refresh_token, security, user_service)
+    await auth_service.logout(
+        request_meta, curr_user, refresh_token, security, user_service
+    )
     return SuccessResponse(message="Log out completed successfully")
 
 
@@ -239,6 +249,9 @@ async def delete_account(
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
+    request_meta: RequestMetaData,
 ):
     refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.delete_account(curr_user, refresh_token, security, user_service)
+    await auth_service.delete_account(
+        request_meta, curr_user, refresh_token, security, user_service
+    )
