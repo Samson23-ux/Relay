@@ -18,6 +18,13 @@ class ProductCreate(ProductBase):
     pass
 
 
+class ProductItem(BaseModel):
+    id: UUID
+    name: str
+    description: str
+    serial: str
+
+
 class ProductResponse(BaseModel):
     id: UUID
     name: str

@@ -1,0 +1,41 @@
+import uuid
+from decimal import Decimal
+from datetime import datetime, timezone
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    UUID,
+    Numeric,
+    Integer,
+    DateTime,
+    ForeignKey,
+    CheckConstraint,
+    PrimaryKeyConstraint,
+)
+
+
+from shared.models.base import Base
+
+
+class CartItem(Base):
+    __tablename__ = "cart_items"
+
+    cart_id: Mapped[uuid.UUID] = mapped_column(
+        UUID,
+        ForeignKey("orders.id", name="order_items_order_id_fk", ondelete="CASCADE"),
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID,
+        ForeignKey("products.id", name="order_items_product_id_fk", ondelete="CASCADE"),
+    )
+    quantity: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("quantity > 1", name="products_quantity_ck")
+    )
+    price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
+    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        PrimaryKeyConstraint("cart_id", "product_id", name="cart_items_pk"),
+    )
