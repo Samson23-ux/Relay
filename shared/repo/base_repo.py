@@ -58,9 +58,9 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     async def get_records(
         self,
-        sort: str,
-        order: str,
-        cursor: str,
+        sort: str | None,
+        order: str | None,
+        cursor: str | None,
         limit: int,
         **filters,
     ) -> dict:

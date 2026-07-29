@@ -134,6 +134,12 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def mock_log_task():
+    with patch("shared.utils.save_log.apply_async"):
+        yield
+
+
 @pytest_asyncio.fixture
 async def create_product(async_client: AsyncClient):
     product_create: dict = {

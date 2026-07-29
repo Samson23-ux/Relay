@@ -1,4 +1,4 @@
-from shared.worker.tasks.log import save_log
+from shared.utils import log_error
 from shared.repo.redis import RedisRepository
 from shared.core.exceptions import ServerError
 from apps.user_service.app.api.models.user import User
@@ -24,16 +24,10 @@ class UserService:
             user: User | None = await self._user_repo.get_record(**filters)
 
             if not user:
-                request_meta["log_level"] = "error"
-                request_meta["message"] = (
-                    f"User not found with email {user_email}"
-                )
-
+                message = f"User not found with email {user_email}"
                 circuit: dict = await self._redis_repo.get_hset(circuit_key)
-                circuit_state = circuit.get("state")
-                request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-                save_log.apply_async(priority=3, kwargs=request_meta)
+                log_error(message, request_meta, circuit)
                 raise UserNotFoundError(user_email=user_email)
 
             return user
@@ -41,38 +35,30 @@ class UserService:
             if isinstance(e, UserNotFoundError):
                 raise UserNotFoundError(user_email=user_email) from e
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while retrieving user with email {user_email}"
-            )
-
+            message = f"Error occured while retrieving user with email {user_email}. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def _get_user_by_email(self, **filters) -> User | None:
         return await self._user_repo.get_record(**filters)
 
-    async def create_user(self, circuit_key: str, request_meta: dict, user: UserInDB, email: str):
+    async def create_user(
+        self, circuit_key: str, request_meta: dict, user: UserInDB, email: str
+    ):
         try:
             self._user_repo.add(entity=user)
             await self._user_repo.commit()
         except Exception as e:
             await self._user_repo.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while creating user with email {email}"
+            message = (
+                f"Error occured while creating user with email {email}. Error: {str(e)}"
             )
-
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def update_user(self, circuit_key: str, request_meta: dict, user: User):
@@ -83,16 +69,10 @@ class UserService:
         except Exception as e:
             await self._user_repo.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while updating user with email {user.email}"
-            )
-
+            message = f"Error occured while updating user with email {user.email}. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def delete_user(self, circuit_key: str, request_meta: dict, user: User):
@@ -102,14 +82,8 @@ class UserService:
         except Exception as e:
             await self._user_repo.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while deleting user with email {user.email}"
-            )
-
+            message = f"Error occured while deleting user with email {user.email}. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e

@@ -14,11 +14,7 @@ from apps.user_service.app.core.security import Security
 
 @pytest_asyncio.fixture(autouse=True)
 async def mock_log_task():
-    with (
-        patch("apps.user_service.app.api.services.auth.save_log.apply_async"),
-        patch("apps.user_service.app.api.services.user.save_log.apply_async"),
-        patch("apps.user_service.app.api.services.email.save_log.apply_async"),
-    ):
+    with patch("shared.utils.save_log.apply_async"):
         yield
 
 

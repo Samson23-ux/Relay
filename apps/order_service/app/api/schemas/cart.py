@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CartBase(BaseModel):
@@ -15,4 +15,4 @@ class CartInDB(CartBase):
 
 
 class CartResponse(CartBase):
-    pass
+    model_config = ConfigDict(from_attributes=True)

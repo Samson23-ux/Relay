@@ -1,7 +1,7 @@
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 from apps.product_service.app.api.schemas.product import ProductItem
@@ -20,4 +20,6 @@ class CartItemInDB(CartItemBase):
 
 
 class CartItemResponse(CartItemBase):
+    model_config = ConfigDict(from_attributes=True)
+
     product: ProductItem

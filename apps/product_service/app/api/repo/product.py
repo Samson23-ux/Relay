@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, select, Sequence
 
 
 from shared.repo.base_repo import BaseRepository
@@ -21,6 +21,7 @@ class ProductRepository(BaseRepository[ProductBase, Product]):
             filter_conditions.append(
                 func.lower(self.model.name) == filters["name"].lower()
             )
+        return filter_conditions
 
     def _get_sort_fields(self, sort):
         sort_fields = []
@@ -30,5 +31,9 @@ class ProductRepository(BaseRepository[ProductBase, Product]):
             "created_at": self.model.created_at,
         }
 
-        sort_fields.append(sortable_fields.get(sort.lower(), self.model.created_at))
+        sort_fields.append(sortable_fields.get(sort, self.model.created_at))
         return sort_fields
+    
+    async def get_products(self, limit: int = 15) -> Sequence[Product]:
+        res = await self._async_session.execute(select(self.model).limit(limit))
+        return res.scalars().all()

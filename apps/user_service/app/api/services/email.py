@@ -1,7 +1,7 @@
 import resend
 from uuid import UUID
 
-from shared.worker.tasks.log import save_log
+from shared.utils import log_error
 from shared.repo.redis import RedisRepository
 from shared.core.exceptions import ServerError
 from apps.user_service.app.api.models.email import Email
@@ -24,14 +24,10 @@ class EmailService:
         except Exception as e:
             await self._email_repo.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = "Error occured while creating email record"
-
+            message = f"Error occured while creating email record. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     def get_processed_email(self, email_id: UUID) -> Email | None:
@@ -45,14 +41,10 @@ class EmailService:
         except Exception as e:
             self._email_repo.sync_rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = "Error occured while updating email record"
-
+            message = f"Error occured while updating email record. Error: {str(e)}"
             circuit: dict = self._redis_repo.sync_get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     @property

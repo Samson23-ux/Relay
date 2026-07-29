@@ -15,7 +15,6 @@ from apps.user_service.app.api.schemas.auth import OtpInDB
 from apps.user_service.app.worker.celery_app import celery_app
 from apps.user_service.app.core.config import get_user_settings
 from apps.user_service.app.worker.services import get_otp_service
-from apps.user_service.app.worker.services import get_email_service
 
 USER_SETTINGS = get_user_settings()
 GLOBAL_SETTINGS = get_global_settings()
@@ -81,6 +80,8 @@ def send_verification_email(
     recipient_email: str,
     user_id: UUID,
 ):
+    from apps.user_service.app.worker.services import get_email_service
+
     try:
         redis_repo = get_redis_repo()
         otp_service = get_otp_service()

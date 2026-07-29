@@ -1,7 +1,7 @@
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 from apps.order_service.app.api.models.order import OrderStatus
@@ -20,5 +20,7 @@ class OrderInDB(OrderBase):
 
 
 class OrderResponse(OrderBase):
+    model_config = ConfigDict(from_attributes=True)
+
     status: OrderStatus
     total_price: Decimal

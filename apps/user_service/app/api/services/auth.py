@@ -1,7 +1,7 @@
 from uuid import UUID, uuid7
 
 
-from shared.worker.tasks.log import save_log
+from shared.utils import log_error, log_info
 from shared.repo.redis import RedisRepository
 from shared.core.exceptions import ServerError
 from shared.repo.uow import UnitOfWorkRepository
@@ -63,16 +63,12 @@ class AuthService:
             await self._redis_repo.create_hset(key, refresh_token_payload)
             return access_token, refresh_token_payload.get("refresh_token")
         except Exception as e:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                "Error occurred while saving refresh token to redis"
+            message = (
+                f"Error occurred while saving refresh token to redis. Error: {str(e)}"
             )
-
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def _revoke_refresh_token(
@@ -87,14 +83,10 @@ class AuthService:
         )
 
         if not refresh_token:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = "Inavlid refresh token received during refresh"
-
+            message = "Inavlid refresh token received during refresh"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise AuthenticationError()
 
         refresh_token_id: str = refresh_token["jti"]
@@ -103,14 +95,10 @@ class AuthService:
         refresh_token_db: dict = await self._redis_repo.get_hset(key)
 
         if not refresh_token_db:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = "Inavlid refresh token received during refresh"
-
+            message = "Inavlid refresh token received during refresh"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise AuthenticationError()
 
         user_email: str = refresh_token_db["email"]
@@ -120,16 +108,10 @@ class AuthService:
             await self._redis_repo.delete_key(key)
             return user_email, user_type
         except Exception as e:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                "Error occurred while deleting refresh token from redis"
-            )
-
+            message = f"Error occurred while deleting refresh token from redis. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def sign_up_with_email(
@@ -171,16 +153,10 @@ class AuthService:
                     },
                 )
             else:
-                request_meta["log_level"] = "error"
-                request_meta["message"] = f"User exists with email {user_email}"
-
+                message = f"User exists with email {user_email}"
                 circuit: dict = await self._redis_repo.get_hset(circuit_key)
-                circuit_state = circuit.get("state")
-                request_meta["circuit_open"] = (
-                    True if circuit_state == "open" else False
-                )
 
-                save_log.apply_async(priority=3, kwargs=request_meta)
+                log_error(message, request_meta, circuit)
                 raise UserExistsError(user_email=user_email)
         else:
             user = UserInDB(
@@ -203,15 +179,10 @@ class AuthService:
                     "user_id": str(user.id),
                 },
             )
-        request_meta["message"] = (
-            f"Email and password sign up completed for user {user_email}"
-        )
-
+        message = f"Email and password sign up completed for user {user_email}"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
+        log_info(message, request_meta, circuit)
 
     async def sign_up_with_google(
         self,
@@ -248,14 +219,10 @@ class AuthService:
             "user", user_email, "google", circuit_key, request_meta, security
         )
 
-        request_meta["message"] = f"Google sign in completed for user {user_email}"
-
+        message = f"Google sign in completed for user {user_email}"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
-
+        log_info(message, request_meta, circuit)
         return access_token, refresh_token
 
     async def verify_account(
@@ -278,14 +245,10 @@ class AuthService:
         existing_user: User | None = await self._user_repo.get_record(email=user_email)
 
         if not existing_user:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = f"User not found with email {user_email}"
-
+            message = f"User not found with email {user_email}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise InvalidOtpError()
 
         otp: Otp = await self._otp_repo.get_record(
@@ -296,14 +259,10 @@ class AuthService:
         )
 
         if not otp:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = f"Invalid otp received from user {user_email}"
-
+            message = f"Invalid otp received from user {user_email}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise InvalidOtpError()
 
         try:
@@ -315,28 +274,17 @@ class AuthService:
 
             await self._uow.commit()
 
-            request_meta["message"] = (
-                f"User {user_email} account verification completed"
-            )
-
+            message = f"User {user_email} account verification completed"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_info(message, request_meta, circuit)
         except Exception as e:
             await self._uow.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while trying to verify user {user_email} account"
-            )
-
+            message = f"Error occured while trying to verify user {user_email} account. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def resend_otp(
@@ -354,14 +302,10 @@ class AuthService:
         )
 
         if not existing_user:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = f"User with email {user_email} not found"
-
+            message = f"User with email {user_email} not found"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise CredentialError()
 
         try:
@@ -387,26 +331,17 @@ class AuthService:
                 },
             )
 
-            request_meta["message"] = f"OTP code resent to user {user_email}"
-
+            message = f"OTP code resent to user {user_email}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_info(message, request_meta, circuit)
         except Exception as e:
             await self._otp_repo.rollback()
 
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Error occured while resending otp to user {user_email}"
-            )
-
+            message = f"Error occured while resending otp to user {user_email}. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise ServerError() from e
 
     async def login(
@@ -424,31 +359,19 @@ class AuthService:
         )
 
         if not existing_user:
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Invalid credentials received from user {user_email}"
-            )
-
+            message = f"Invalid credentials received from user {user_email}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise CredentialError()
 
         if not await security.verify_password(
             email_login.password, existing_user.hashed_password
         ):
-            request_meta["log_level"] = "error"
-            request_meta["message"] = (
-                f"Invalid credentials received from user {user_email}"
-            )
-
+            message = f"Invalid credentials received from user {user_email}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-            circuit_state = circuit.get("state")
-            request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-            save_log.apply_async(priority=3, kwargs=request_meta)
+            log_error(message, request_meta, circuit)
             raise CredentialError()
 
         existing_user.is_active = True
@@ -458,14 +381,10 @@ class AuthService:
             "user", user_email, "email", circuit_key, request_meta, security
         )
 
-        request_meta["message"] = f"Login completed for user {user_email}"
-
+        message = f"Login completed for user {user_email}"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
-
+        log_info(message, request_meta, circuit)
         return access_token, refresh_token
 
     async def create_auth_tokens(
@@ -479,16 +398,10 @@ class AuthService:
             "user", user_email, user_type, circuit_key, request_meta, security
         )
 
-        request_meta["message"] = (
-            f"Access and refresh tokens created for user {user_email}"
-        )
-
+        message = f"Access and refresh tokens created for user {user_email}"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
-
+        log_info(message, request_meta, circuit)
         return access_token, refresh_token
 
     async def get_current_user(
@@ -503,13 +416,11 @@ class AuthService:
             user_email: str = curr_user.google_email
             user = GoogleUserResponse.model_validate(curr_user)
 
-        request_meta["message"] = f"User {user_email} account retrieved"
+        request_meta["user_id"] = curr_user.id
+        message = f"User {user_email} account retrieved"
 
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
-
-        save_log.apply_async(priority=3, kwargs=request_meta)
+        log_info(message, request_meta, circuit)
 
         return user
 
@@ -523,19 +434,20 @@ class AuthService:
     ):
         circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
+        request_meta["user_id"] = curr_user.id
         user_email: str = get_user_email(curr_user)
-        _ = await self._revoke_refresh_token(circuit_key, request_meta, refresh_token, security)
+
+        _ = await self._revoke_refresh_token(
+            circuit_key, request_meta, refresh_token, security
+        )
 
         curr_user.is_active = False
         await user_service.update_user(circuit_key, request_meta, curr_user)
 
-        request_meta["message"] = f"User {user_email} account logout completed"
-
+        message = f"User {user_email} account logout completed"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
+        log_info(message, request_meta, circuit)
 
     async def delete_account(
         self,
@@ -548,13 +460,14 @@ class AuthService:
         user_email: str = get_user_email(curr_user)
         circuit_key: str = f"circuit:{request_meta.get("upstream")}"
 
+        request_meta["user_id"] = curr_user.id
         await user_service.delete_user(circuit_key, request_meta, curr_user)
-        _ = await self._revoke_refresh_token(circuit_key, request_meta, refresh_token, security)
 
-        request_meta["message"] = f"User {user_email} account deleted"
+        _ = await self._revoke_refresh_token(
+            circuit_key, request_meta, refresh_token, security
+        )
 
+        message = f"User {user_email} account deleted"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)
-        circuit_state = circuit.get("state")
-        request_meta["circuit_open"] = True if circuit_state == "open" else False
 
-        save_log.apply_async(priority=3, kwargs=request_meta)
+        log_info(message, request_meta, circuit)

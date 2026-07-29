@@ -3,28 +3,16 @@ from typing import Annotated
 from fastapi import APIRouter, Request, Query
 
 
-from apps.product_service.app.deps import ProductService
+from apps.product_service.app.deps import ProductServiceDep
 from shared.shared_deps import CurrUserDep, RequestMetaData
 from shared.schemas.response import SuccessResponse, AllSuccessResponse
-from apps.product_service.app.api.schemas.product import ProductCreate, ProductUpdate, ProductResponse
+from apps.product_service.app.api.schemas.product import (
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse,
+)
 
 router = APIRouter()
-
-
-@router.get(
-    "/products/{id}",
-    status_code=200,
-    description="Get a product by its id",
-    response_model=SuccessResponse[ProductResponse],
-)
-async def get_product_by_id(
-    id: UUID,
-    request: Request,
-    curr_user: CurrUserDep,
-    request_meta: RequestMetaData,
-    product_service: ProductService,
-):
-    pass
 
 
 # product page with cache implementation
@@ -38,9 +26,14 @@ async def get_products(
     request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
-    product_service: ProductService,
+    product_service: ProductServiceDep,
 ):
-    pass
+    products: list[ProductResponse] = await product_service.get_products(
+        curr_user, request_meta
+    )
+    return SuccessResponse(
+        message="Page products retrieved successfully", data=products
+    )
 
 
 @router.get(
@@ -53,7 +46,7 @@ async def get_all_products(
     request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
-    product_service: ProductService,
+    product_service: ProductServiceDep,
     cursor: Annotated[
         str,
         Query(description="Cursor of last received product batch. None if first fetch"),
@@ -68,7 +61,35 @@ async def get_all_products(
         str, Query(description="Order products in ascending(asc) or descending(desc)")
     ] = "asc",
 ):
-    pass
+    res: dict = await product_service.get_all_products(
+        curr_user, request_meta, sort, limit, order, cursor
+    )
+
+    cursor: str = res.get("cursor")
+    products: list[ProductResponse] = res.get("data")
+
+    return AllSuccessResponse(
+        message="Products retrieved successfully", data=products, cursor=cursor
+    )
+
+
+@router.get(
+    "/products/{id}",
+    status_code=200,
+    description="Get a product by its id",
+    response_model=SuccessResponse[ProductResponse],
+)
+async def get_product_by_id(
+    id: UUID,
+    request: Request,
+    curr_user: CurrUserDep,
+    request_meta: RequestMetaData,
+    product_service: ProductServiceDep,
+):
+    product: ProductResponse = await product_service.get_product_by_id(
+        id, curr_user, request_meta
+    )
+    return SuccessResponse(message="Product retrieved successfully", data=product)
 
 
 @router.post(
@@ -82,9 +103,12 @@ async def create_product(
     curr_user: CurrUserDep,
     product_create: ProductCreate,
     request_meta: RequestMetaData,
-    product_service: ProductService,
+    product_service: ProductServiceDep,
 ):
-    pass
+    product: ProductResponse = await product_service.create_product(
+        curr_user, request_meta, product_create
+    )
+    return SuccessResponse(message="Product created successfully", data=product)
 
 
 @router.patch(
@@ -99,9 +123,12 @@ async def update_product(
     curr_user: CurrUserDep,
     product_update: ProductUpdate,
     request_meta: RequestMetaData,
-    product_service: ProductService,
+    product_service: ProductServiceDep,
 ):
-    pass
+    product: ProductResponse = await product_service.update_product(
+        id, curr_user, request_meta, product_update
+    )
+    return SuccessResponse(message="Product updated successfully", data=product)
 
 
 @router.delete(
@@ -114,6 +141,6 @@ async def delete_product(
     request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
-    product_service: ProductService,
+    product_service: ProductServiceDep,
 ):
-    pass
+    await product_service.delete_product(id, curr_user, request_meta)

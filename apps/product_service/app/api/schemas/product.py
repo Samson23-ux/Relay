@@ -6,13 +6,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProductBase(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, from_attributes=True)
 
     name: str
     description: str = Field(..., min_length=15)
     serial: str = Field(..., min_length=8)
     price: Decimal = Field(..., decimal_places=2)
     quantity: int = Field(..., ge=1)
+
+
+class ProductInDB(ProductBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime | None
 
 
 class ProductCreate(ProductBase):
@@ -34,12 +40,5 @@ class ProductItem(BaseModel):
     serial: str
 
 
-class ProductResponse(BaseModel):
-    id: UUID
-    name: str
-    description: str
-    serial: str
-    price: Decimal
-    quantity: int
-    created_at: datetime
-    updated_at: datetime | None
+class ProductResponse(ProductInDB):
+    pass
