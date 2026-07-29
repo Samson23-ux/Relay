@@ -2,8 +2,8 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from apps.user_service.app.api.models.user import UserType
 from apps.user_service.app.api.models.otp import OtpStatus
+from apps.user_service.app.api.models.user import UserType, UserRole
 
 
 class AuthBase(BaseModel):
@@ -12,6 +12,7 @@ class AuthBase(BaseModel):
 
 class TokenData(AuthBase):
     email: str
+    role: UserRole
     user_type: UserType
 
 

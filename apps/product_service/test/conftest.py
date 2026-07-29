@@ -18,15 +18,13 @@ from sqlalchemy.ext.asyncio import (
 
 
 from shared.models.base import Base
-from apps.user_service.app.main import app
+from apps.product_service.app.main import app
 from shared.repo.redis import RedisRepository
-from apps.user_service.app.api.models.otp import Otp
+from apps.user_service.app.api.models.user import User
 from shared.database.shared_session import get_session
-from apps.user_service.app.deps import get_auth_service
 from shared.core.shared_config import get_global_settings
-from apps.user_service.app.api import models  # noqa: F401
-from apps.user_service.app.api.services.auth import AuthService
-from shared.shared_deps import get_redis_client, request_metadata
+from apps.product_service.app.api import models  # noqa: F401
+from shared.shared_deps import get_redis_client, request_metadata, get_current_user
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -114,7 +112,16 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     async def get_test_session():
         return async_session
 
+    fake_user = User(
+        id=uuid7(),
+        type="email",
+        role="admin",
+        email="user@example.com",
+        hashed_password="test_user_password",
+    )
+
     app.dependency_overrides[get_session] = get_test_session
+    app.dependency_overrides[get_current_user] = lambda: fake_user
     app.dependency_overrides[get_redis_client] = lambda: test_redis_client
     app.dependency_overrides[request_metadata] = lambda: {"upstream": "test"}
 
@@ -128,75 +135,18 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
 
 @pytest_asyncio.fixture
-async def create_user(async_client: AsyncClient):
-    path: str = (
-        "apps.user_service.app.api.services.auth.send_verification_email.apply_async"
-    )
-
-    sign_up_payload: dict = {
-        "email": "user@example.com",
-        "password": "test_user_password",
-    }
-
-    with patch(path, new_callable=AsyncMock) as email_patch:
-        res: Response = await async_client.post(
-            "/auth/signup",
-            json=sign_up_payload,
-
-        )
-
-    email_patch.assert_called_once()
-
-    return res
-
-
-def mock_auth_service(fake_otp: Otp, redis: Redis):
-    otp_repo = AsyncMock()
-    redis = RedisRepository(async_redis=redis)
-
-    otp_repo.get_record = AsyncMock(return_value=fake_otp)
-    auth_service = AuthService(otp_repo=otp_repo, redis_repo=redis)
-
-    app.dependency_overrides[get_auth_service] = lambda: auth_service
-
-
-@pytest_asyncio.fixture
-async def verify_user(
-    async_client: AsyncClient, create_user: Response, test_redis_client: Redis
-):
-    fake_otp: Otp = Otp(
-        id=uuid7(),
-        otp="test_otp_token",
-        user_id=uuid7(),
-        status="valid",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
-    )
-
-    otp_payload: dict = {
-        "email": "user@example.com",
-        "otp_code": "test_otp_token",
-    }
-
-    mock_auth_service(fake_otp, test_redis_client)
-
-    res: Response = await async_client.patch(
-        "/auth/verify",
-        json=otp_payload,
-    )
-
-    return res
-
-
-@pytest_asyncio.fixture
-async def login(async_client: AsyncClient, verify_user: Response):
-    login_payload: dict = {
-        "email": "user@example.com",
-        "password": "test_user_password",
+async def create_product(async_client: AsyncClient):
+    product_create: dict = {
+        "name": "test_product",
+        "description": "This is a fake test product.",
+        "serial": "EumHUV41owYwmnzpjVKYng",
+        "price": "50.00",
+        "quantity": "15"
     }
 
     res: Response = await async_client.post(
-        "/auth/login",
-        json=login_payload,
+        "/products",
+        json=product_create,
     )
 
     return res

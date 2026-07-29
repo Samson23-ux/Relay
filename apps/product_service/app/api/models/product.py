@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import (
     text,
     UUID,
+    Index,
     String,
     Numeric,
     Integer,
@@ -36,5 +37,8 @@ class Product(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
-        PrimaryKeyConstraint("id", name="products_pk")
+        PrimaryKeyConstraint("id", name="products_pk"),
+        Index("idx_products_price", price),
+        Index("idx_products_quantity", quantity),
+        Index("idx_products_created_at", created_at),
     )

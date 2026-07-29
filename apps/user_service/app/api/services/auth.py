@@ -46,13 +46,14 @@ class AuthService:
 
     async def _get_tokens(
         self,
+        role: str,
         email: str,
         user_type: str,
         circuit_key: str,
         request_meta: dict,
         security: Security,
     ):
-        token_data: TokenData = TokenData(email=email, user_type=user_type)
+        token_data: TokenData = TokenData(email=email, role=role, user_type=user_type)
         access_token, refresh_token_payload = await security.prepare_tokens(token_data)
 
         refresh_token_id: str = refresh_token_payload.get("refresh_token_id")
@@ -244,7 +245,7 @@ class AuthService:
             await user_service.create_user(circuit_key, request_meta, user, user_email)
 
         access_token, refresh_token = await self._get_tokens(
-            user_email, "google", circuit_key, request_meta, security
+            "user", user_email, "google", circuit_key, request_meta, security
         )
 
         request_meta["message"] = f"Google sign in completed for user {user_email}"
@@ -454,7 +455,7 @@ class AuthService:
         await user_service.update_user(circuit_key, request_meta, existing_user)
 
         access_token, refresh_token = await self._get_tokens(
-            user_email, "email", circuit_key, request_meta, security
+            "user", user_email, "email", circuit_key, request_meta, security
         )
 
         request_meta["message"] = f"Login completed for user {user_email}"
@@ -475,7 +476,7 @@ class AuthService:
             circuit_key, request_meta, refresh_token, security
         )
         access_token, refresh_token = await self._get_tokens(
-            user_email, user_type, circuit_key, request_meta, security
+            "user", user_email, user_type, circuit_key, request_meta, security
         )
 
         request_meta["message"] = (

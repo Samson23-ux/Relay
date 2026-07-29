@@ -72,7 +72,7 @@ class TestSignUpWithEmail:
         }
 
         res: httpx.Response = await async_client.post(
-            "/auth/signup", json=sign_up_payload, headers={"env": "test"}
+            "/auth/signup", json=sign_up_payload
         )
 
         assert res.status_code == 409
@@ -85,7 +85,7 @@ class TestSignUpWithEmail:
         }
 
         res: httpx.Response = await async_client.post(
-            "/auth/signup", json=sign_up_payload, headers={"env": "test"}
+            "/auth/signup", json=sign_up_payload
         )
 
         assert res.status_code == 422
@@ -111,7 +111,6 @@ class TestLogin:
         res: httpx.Response = await async_client.post(
             "/auth/login",
             json=login_payload,
-            headers={"env": "test"},
         )
 
         assert res.status_code == 400
@@ -128,7 +127,6 @@ class TestLogin:
         res: httpx.Response = await async_client.post(
             "/auth/login",
             json=login_payload,
-            headers={"env": "test"},
         )
 
         assert res.status_code == 400
@@ -141,9 +139,7 @@ class TestSignUpWithGoogle:
 
         url_path: str = "apps.user_service.app.api.routers.user.Request.url_for"
         with patch(url_path, new_callable=AsyncMock) as url_patch:
-            res: httpx.Response = await async_client.get(
-                "/auth/google", headers={"env": "test"}
-            )
+            res: httpx.Response = await async_client.get("/auth/google")
 
         assert res.status_code == 302
 
@@ -153,9 +149,7 @@ class TestSignUpWithGoogle:
     async def test_google_callback(self, async_client: httpx.AsyncClient):
         app.dependency_overrides[get_security] = lambda: get_security_mock()
 
-        res: httpx.Response = await async_client.get(
-            "/auth/google/callback", headers={"env": "test"}
-        )
+        res: httpx.Response = await async_client.get("/auth/google/callback")
 
         json_res = res.json()
 
@@ -170,7 +164,6 @@ class TestAuthToken:
     ):
         res = await async_client.post(
             "/auth/refresh",
-            headers={"env": "test"},
         )
         json_res = res.json()
 
@@ -183,7 +176,6 @@ class TestAuthToken:
     ):
         res = await async_client.post(
             "/auth/refresh",
-            headers={"env": "test"},
         )
 
         assert res.status_code == 401
@@ -195,7 +187,6 @@ class TestGetCurrentUser:
         res: httpx.Response = await async_client.get(
             "/auth/me",
             headers={
-                "env": "test",
                 "X-USER-TYPE": "email",
                 "X-USER-EMAIL": "user@example.com",
             },
@@ -224,7 +215,6 @@ class TestResendOtp:
             res: httpx.Response = await async_client.post(
                 "/auth/verify/resend",
                 json=resend_otp_payload,
-                headers={"env": "test"},
             )
 
         json_res = res.json()
@@ -245,7 +235,6 @@ class TestResendOtp:
         res: httpx.Response = await async_client.post(
             "/auth/verify/resend",
             json=resend_otp_payload,
-            headers={"env": "test"},
         )
 
         assert res.status_code == 400
@@ -257,7 +246,6 @@ class TestLogout:
         res = await async_client.post(
             "/auth/logout",
             headers={
-                "env": "test",
                 "X-USER-TYPE": "email",
                 "X-USER-EMAIL": "user@example.com",
             },
@@ -272,7 +260,6 @@ class TestDeleteAccount:
         res = await async_client.delete(
             "/auth",
             headers={
-                "env": "test",
                 "X-USER-TYPE": "email",
                 "X-USER-EMAIL": "user@example.com",
             },
@@ -288,7 +275,6 @@ class TestDeleteAccount:
         res: httpx.Response = await async_client.post(
             "/auth/login",
             json=login_payload,
-            headers={"env": "test"},
         )
 
         assert res.status_code == 400
