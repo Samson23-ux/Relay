@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 
+from shared.schemas.response import ErrorResponse
 from shared.core.exceptions import create_exception_handler
 from shared.core.exceptions import ServerError, ServiceUnavailable
 
@@ -14,10 +15,7 @@ class GlobalExceptionHandler:
             ServerError,
             create_exception_handler(
                 status_code=500,
-                initial_detail={
-                    "status": "error",
-                    "message": "Oops! Something went wrong.",
-                },
+                initial_detail=ErrorResponse(message="Oops! Something went wrong."),
             ),
         )
 
@@ -25,9 +23,8 @@ class GlobalExceptionHandler:
             ServiceUnavailable,
             create_exception_handler(
                 status_code=503,
-                initial_detail={
-                    "status": "error",
-                    "message": "Service unavailble! Try again after five minutes",
-                },
+                initial_detail=ErrorResponse(
+                    message="Service unavailble! Try again after five minutes"
+                ),
             ),
         )

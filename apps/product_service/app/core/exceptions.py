@@ -22,3 +22,17 @@ class ProductsNotFoundError(AppException):
     """Products not found"""
 
     pass
+
+
+class OutOfStockError(AppException):
+    "Product ran out of stock"
+
+    def __init__(self, id: UUID):
+        self.id = id
+
+
+class NotEnoughStockError(AppException):
+    "Product remaining quantity less than required"
+
+    def __init__(self, id: UUID):
+        self.id = id

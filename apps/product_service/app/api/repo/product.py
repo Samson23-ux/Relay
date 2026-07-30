@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy import func, select, Sequence
 
 
@@ -33,7 +34,13 @@ class ProductRepository(BaseRepository[ProductBase, Product]):
 
         sort_fields.append(sortable_fields.get(sort, self.model.created_at))
         return sort_fields
-    
+
     async def get_products(self, limit: int = 15) -> Sequence[Product]:
         res = await self._async_session.execute(select(self.model).limit(limit))
         return res.scalars().all()
+
+    async def get_product_with_lock(self, id: UUID) -> Product | None:
+        res = await self._async_session.execute(
+            select(self.model).where(self.model.id == id).with_for_update()
+        )
+        return res.scalar()

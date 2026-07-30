@@ -16,7 +16,9 @@ from apps.product_service.app.api.schemas.product import (
     ProductResponse,
 )
 from apps.product_service.app.core.exceptions import (
+    OutOfStockError,
     ProductExistsError,
+    NotEnoughStockError,
     ProductNotFoundError,
     ProductsNotFoundError,
 )
@@ -57,7 +59,9 @@ class ProductService:
                     p["id"] = str(p["id"])
                     p["price"] = str(p["price"])
                     p["created_at"] = p["created_at"].isoformat()
-                    p["updated_at"] = p["updated_at"].isoformat() if p["updated_at"] else None
+                    p["updated_at"] = (
+                        p["updated_at"].isoformat() if p["updated_at"] else None
+                    )
 
                 products: str = json.dumps(cache_data)
                 await self._redis_repo.set_key("page:products", products)
@@ -155,6 +159,62 @@ class ProductService:
                 raise ProductNotFoundError(id=id)
 
             message = f"Error occured while retrieving product. Error: {str(exc)}"
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+            log_error(message, request_meta, circuit)
+            raise ServerError() from exc
+
+    async def reserve_product(
+        self, id: UUID, quantity: int, curr_user: User, request_meta: dict
+    ) -> ProductResponse:
+        request_meta["user_id"] = curr_user.id
+        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+
+        try:
+            product_db: Product | None = await self._product_repo.get_product_with_lock(
+                id=id
+            )
+
+            if not product_db:
+                message = f"Product not found with id: {id}"
+                circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+                log_error(message, request_meta, circuit)
+                raise ProductNotFoundError(id=id)
+
+            if product_db.quantity < 1:
+                message = f"Product out of stock. Id: {id}"
+                circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+                log_error(message, request_meta, circuit)
+                raise OutOfStockError(id=id)
+
+            if product_db.quantity < quantity:
+                message = f"Product stock not enough. Id: {id}"
+                circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+                log_error(message, request_meta, circuit)
+                raise NotEnoughStockError(id=id)
+
+            product_db.quantity -= quantity
+
+            self._product_repo.add(model=product_db)
+            await self._product_repo.commit()
+
+            return ProductResponse.model_validate(product_db)
+        except Exception as exc:
+            await self._product_repo.rollback()
+
+            if isinstance(exc, ProductNotFoundError):
+                raise ProductNotFoundError(id=id)
+            elif isinstance(exc, OutOfStockError):
+                raise OutOfStockError(id=id)
+            elif isinstance(exc, NotEnoughStockError):
+                raise NotEnoughStockError(id=id)
+
+            message = (
+                f"Error occured while reserving product for orders. Error: {str(exc)}"
+            )
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
 
             log_error(message, request_meta, circuit)

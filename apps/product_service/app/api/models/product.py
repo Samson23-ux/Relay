@@ -29,7 +29,7 @@ class Product(Base):
     serial: Mapped[str] = mapped_column(String)
     price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
     quantity: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("quantity > 1", name="products_quantity_ck")
+        Integer, CheckConstraint("quantity >= 0", name="products_quantity_ck")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

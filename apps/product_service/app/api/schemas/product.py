@@ -41,4 +41,4 @@ class ProductItem(BaseModel):
 
 
 class ProductResponse(ProductInDB):
-    pass
+    quantity: int

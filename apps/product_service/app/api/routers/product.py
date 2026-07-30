@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import Annotated
-from fastapi import APIRouter, Request, Query
+from fastapi import APIRouter, Query
 
 
 from apps.product_service.app.deps import ProductServiceDep
@@ -23,7 +23,6 @@ router = APIRouter()
     response_model=SuccessResponse[ProductResponse],
 )
 async def get_products(
-    request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
     product_service: ProductServiceDep,
@@ -43,7 +42,6 @@ async def get_products(
     response_model=AllSuccessResponse[ProductResponse],
 )
 async def get_all_products(
-    request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
     product_service: ProductServiceDep,
@@ -81,7 +79,6 @@ async def get_all_products(
 )
 async def get_product_by_id(
     id: UUID,
-    request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
     product_service: ProductServiceDep,
@@ -92,6 +89,25 @@ async def get_product_by_id(
     return SuccessResponse(message="Product retrieved successfully", data=product)
 
 
+@router.patch(
+    "/products/{id}/reserve",
+    status_code=200,
+    description="Reserve a product for orders and cart",
+    response_model=SuccessResponse[ProductResponse],
+)
+async def reserve_product(
+    id: UUID,
+    curr_user: CurrUserDep,
+    quantity: Annotated[int, Query(..., ge=1)],
+    request_meta: RequestMetaData,
+    product_service: ProductServiceDep,
+):
+    product: ProductResponse = await product_service.reserve_product(
+        id, quantity, curr_user, request_meta
+    )
+    return SuccessResponse(message="Product reserved successfully", data=product)
+
+
 @router.post(
     "/products",
     status_code=201,
@@ -99,7 +115,6 @@ async def get_product_by_id(
     response_model=SuccessResponse[ProductResponse],
 )
 async def create_product(
-    request: Request,
     curr_user: CurrUserDep,
     product_create: ProductCreate,
     request_meta: RequestMetaData,
@@ -119,7 +134,6 @@ async def create_product(
 )
 async def update_product(
     id: UUID,
-    request: Request,
     curr_user: CurrUserDep,
     product_update: ProductUpdate,
     request_meta: RequestMetaData,
@@ -138,7 +152,6 @@ async def update_product(
 )
 async def delete_product(
     id: UUID,
-    request: Request,
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
     product_service: ProductServiceDep,

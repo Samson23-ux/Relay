@@ -37,7 +37,6 @@ GLOBAL_SETTINGS = get_global_settings()
     ),
 )
 async def sign_up_with_email(
-    request: Request,
     security: SecurityDep,
     email_login: EmailSignUp,
     auth_service: AuthServiceDep,
@@ -108,7 +107,6 @@ async def google_callback(
     description="Verify account by submitting the received otp code",
 )
 async def verify_account(
-    request: Request,
     uow: UnitOfWorkRepo,
     email_verify: EmailVerify,
     auth_service: AuthServiceDep,
@@ -125,7 +123,6 @@ async def verify_account(
     response_model=SuccessResponse[OtpResendResponse],
 )
 async def resend_otp(
-    request: Request,
     otp_resend: ResendOtp,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
@@ -145,7 +142,6 @@ async def resend_otp(
     response_model=SuccessResponse[Token],
 )
 async def login(
-    request: Request,
     response: Response,
     security: SecurityDep,
     email_login: EmailLogin,
@@ -210,7 +206,6 @@ async def create_new_token(
     response_model=SuccessResponse[EmailUserResponse | GoogleUserResponse],
 )
 async def get_current_user(
-    request: Request,
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     request_meta: RequestMetaData,
