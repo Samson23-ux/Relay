@@ -1,12 +1,10 @@
 import uuid
-from decimal import Decimal
 from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import (
     text,
     UUID,
     Index,
-    Numeric,
     Integer,
     DateTime,
     ForeignKey,

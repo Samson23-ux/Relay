@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CartBase(BaseModel):
@@ -12,6 +12,11 @@ class CartBase(BaseModel):
 
 class CartInDB(CartBase):
     pass
+
+
+class AddToCart(BaseModel):
+    product_id: UUID
+    quantity: int = Field(..., ge=1)
 
 
 class CartResponse(CartBase):
