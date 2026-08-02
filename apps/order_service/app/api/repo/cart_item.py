@@ -1,5 +1,6 @@
 from uuid import UUID
-from sqlalchemy import select
+from typing import Any
+from sqlalchemy import select, desc
 from sqlalchemy.dialects.postgresql import insert
 
 
@@ -26,7 +27,7 @@ class CartItemRepository(BaseRepository[CartItemBase, CartItem]):
         return filter_conditions
 
     def _get_sort_fields(self, sort):
-        return super()._get_sort_fields(sort)
+        return [self.model.created_at]
 
     async def get_cart_item(self, **filters) -> CartItem | None:
         filter_conditions = self._get_filters(**filters)
@@ -57,7 +58,7 @@ class CartItemRepository(BaseRepository[CartItemBase, CartItem]):
         res = await self._async_session.execute(stmt)
         return res.all()
 
-    async def get_carts_with_items(self, user_id: UUID):
+    async def get_carts_with_items(self, user_id: UUID, sort: str | None, order: str):
         stmt = (
             select(
                 Product.id,
@@ -74,6 +75,14 @@ class CartItemRepository(BaseRepository[CartItemBase, CartItem]):
             .join(Product, Product.id == self.model.product_id)
             .where(Cart.user_id == user_id)
         )
+
+        if sort:
+            sort_fields: list[Any] = self._get_sort_fields(sort)
+            if order == "desc":
+                stmt = stmt.order_by(desc(*sort_fields))
+            else:
+                stmt = stmt.order_by(*sort_fields)
+
         res = await self._async_session.execute(stmt)
         return res.all()
 

@@ -54,26 +54,25 @@ def process_reservation(self, payload: dict, request_meta: dict):
 
         if not reserve_processed:
             order_id: str = payload.get("order_id")
-            quantity: int = payload.get("quantity")
-            product_id: str = payload.get("product_id")
+            products: dict = payload.get("products")
 
             request_meta["parent_span_id"] = request_meta.get("span_id")
             request_meta["span_id"] = str(uuid7())
 
             if event == "reserve":
-                product_service.reserve_product(
-                    order_id, product_id, quantity, request_meta, uow
+                res = product_service.reserve_product(
+                    order_id, products, request_meta, uow
                 )
             elif event == "release_reserve":
-                product_service.release_reserve(order_id, product_id, request_meta)
+                res = product_service.release_reserve(order_id, products, request_meta)
             elif event == "confirm":
-                product_service.confirm_reserve(order_id, product_id, request_meta, uow)
+                res = product_service.confirm_reserve(order_id, products, request_meta, uow)
 
             redis.mark_task_processed(
                 f"reserve:{message_id}", "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL
             )
 
-        return request_meta.get("span_id")
+        return {"data": res, "span_id": request_meta.get("span_id")}
     except (
         psycopg2.OperationalError,
         psycopg2.InterfaceError,

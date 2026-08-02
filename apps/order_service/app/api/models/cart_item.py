@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import (
     UUID,
+    Index,
     Numeric,
     Integer,
     DateTime,
@@ -38,4 +39,5 @@ class CartItem(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("cart_id", "product_id", name="cart_items_pk"),
+        Index("idx_cart_items_created_at", created_at),
     )

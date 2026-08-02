@@ -22,7 +22,7 @@ class CartRepository(BaseRepository[CartBase, Cart]):
         return filter_conditions
 
     def _get_sort_fields(self, sort):
-        return super()._get_sort_fields(sort)
+        return [self.model.created_at]
 
     async def get_cart_with_lock(self, read: bool, **filters) -> Cart | None:
         filter_conditions = self._get_filters(**filters)

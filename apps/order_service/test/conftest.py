@@ -224,3 +224,10 @@ async def create_cart(async_client: AsyncClient) -> Response:
     }
     res: Response = await async_client.post("/carts", json=cart_item)
     return res
+
+
+@pytest_asyncio.fixture
+async def create_order(create_cart: Response, async_client: AsyncClient) -> Response:
+    cart_id = create_cart.json()["data"]["id"]
+    res: Response = await async_client.post("/orders", params={"cart_id": cart_id})
+    return res

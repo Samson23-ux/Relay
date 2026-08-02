@@ -44,5 +44,6 @@ class Order(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("id", name="orders_pk"),
+        Index("idx_orders_created_at", created_at),
         Index("idx_orders_user_id_comp", id, user_id)
     )

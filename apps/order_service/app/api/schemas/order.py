@@ -18,9 +18,7 @@ class OrderInDB(OrderBase):
     total_price: Decimal = Field(..., decimal_places=2)
 
 
-class OrderResponse(OrderBase):
+class OrderResponse(OrderInDB):
     model_config = ConfigDict(from_attributes=True)
 
-    status: OrderStatus
-    total_price: Decimal
     created_at: datetime

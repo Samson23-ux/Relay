@@ -73,6 +73,8 @@ class CartService:
         self,
         items: bool,
         curr_user: User,
+        order: str,
+        sort: str | None,
         request_meta: dict,
         cart_item_service: CartItemService,
     ) -> list[CartResponse | CartItemResponse]:
@@ -82,7 +84,9 @@ class CartService:
 
         try:
             if items:
-                carts_db = await cart_item_service._get_carts_items(user_id)
+                carts_db = await cart_item_service._get_carts_items(
+                    user_id, sort, order
+                )
 
                 if not carts_db:
                     message = "User carts not found in database"
@@ -100,7 +104,7 @@ class CartService:
                 return carts
             else:
                 carts_db: Sequence[Cart] = await self._cart_repo._get_records(
-                    user_id=user_id
+                    order, sort, user_id=user_id
                 )
 
                 if not carts_db:
@@ -461,7 +465,6 @@ class CartService:
                 user_id, cart_id=cart_id, product_id=product_id
             )
             cart_items = self._get_item_response(cart_items_db)
-
 
             message = (
                 "Cart item quantity incremented successfully."

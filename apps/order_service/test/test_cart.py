@@ -2,17 +2,8 @@ import httpx
 import pytest
 import pytest_asyncio
 from uuid import UUID, uuid7
+from unittest.mock import patch
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
-
-
-from apps.order_service.app.main import app
-from shared.repo.redis import RedisRepository
-from apps.order_service.app.deps import get_cart_item_service
-from apps.product_service.app.api.schemas.product import ProductItem
-from apps.order_service.app.api.repo.cart_item import CartItemRepository
-from apps.order_service.app.api.services.cart_item import CartItemService
-from apps.order_service.app.api.schemas.cart_item import CartItemResponse
 
 product = {
     "id": "019fb2f7-2003-74d1-91fb-79bcb506c77f",
@@ -40,11 +31,7 @@ async def mock_get_product():
 
 class TestCreateCart:
     @pytest.mark.asyncio
-    async def test_create_cart(
-        self,
-        create_cart: httpx.Response,
-        async_client: httpx.AsyncClient,
-    ):
+    async def test_create_cart(self, create_cart: httpx.Response):
         json_res = create_cart.json()
 
         assert create_cart.status_code == 201
@@ -222,9 +209,7 @@ class TestRemoveItem:
             "quantity": 5,
         }
 
-        await async_client.post(
-            "/carts", json=cart_item, params={"cart_id": cart_id}
-        )
+        await async_client.post("/carts", json=cart_item, params={"cart_id": cart_id})
 
         res: httpx.Response = await async_client.patch(
             f"/carts/{cart_id}/products/{prd_id}/remove"

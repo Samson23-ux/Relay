@@ -23,10 +23,12 @@ async def get_carts(
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
     cart_item_service: CartItemServiceDep,
-    items: Annotated[bool, Query(description="Return cart with items.")] = False,
+    sort: Annotated[str, Query(description="Sort by created_at")] = None,
+    items: Annotated[bool, Query(description="Return carts with items.")] = False,
+    order: Annotated[str, Query(description="Order result in asc or desc")] = "asc",
 ):
     carts: list[CartResponse | CartItemResponse] = await cart_service.get_carts(
-        items, curr_user, request_meta, cart_item_service
+        items, curr_user, order, sort, request_meta, cart_item_service
     )
     return SuccessResponse(message="Carts retrieved successfully", data=carts)
 

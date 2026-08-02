@@ -14,13 +14,11 @@ class CartItemService:
         self._item_repo = item_repo
         self._redis_repo = redis_repo
 
-    async def _get_carts_items(self, user_id: UUID):
-        return await self._item_repo.get_carts_with_items(user_id)
+    async def _get_carts_items(self, user_id: UUID, sort: str | None, order: str):
+        return await self._item_repo.get_carts_with_items(user_id, sort, order)
 
     async def _get_cart_items(self, user_id: UUID, **filters):
-        return await self._item_repo.get_cart_with_items(
-            user_id, **filters
-        )
+        return await self._item_repo.get_cart_with_items(user_id, **filters)
 
     async def _get_cart_item(self, cart_id: UUID, product_id: UUID) -> CartItem | None:
         return await self._item_repo.get_cart_item(

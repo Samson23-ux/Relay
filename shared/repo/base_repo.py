@@ -10,7 +10,6 @@ from sqlalchemy import select, Sequence, desc, asc, update
 
 from shared.utils import encode_data, decode_string
 
-
 Entity = TypeVar("Entity", bound=BaseModel)
 SqlalchemyModel = TypeVar("SqlAlchemyModel", bound=DeclarativeBase)
 
@@ -66,10 +65,21 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
         await self._async_session.delete(model)
         await self._async_session.flush()
 
-    async def _get_records(self, **filters) -> Sequence[SqlalchemyModel]:
+    async def _get_records(
+        self, order: str, sort: str | None, **filters
+    ) -> Sequence[SqlalchemyModel]:
         filter_conditions: list[Any] = self._get_filters(**filters)
 
-        res = await self._async_session.execute(select(self.model).where(*filter_conditions))
+        stmt = select(self.model).where(*filter_conditions)
+
+        if sort:
+            sort_fields: list[Any] = self._get_sort_fields(sort)
+            if order == "desc":
+                stmt = stmt.order_by(desc(*sort_fields))
+            else:
+                stmt = stmt.order_by(*sort_fields)
+
+        res = await self._async_session.execute(stmt)
         return res.scalars().all()
 
     async def get_records(
