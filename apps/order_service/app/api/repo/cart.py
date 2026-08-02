@@ -24,10 +24,15 @@ class CartRepository(BaseRepository[CartBase, Cart]):
     def _get_sort_fields(self, sort):
         return super()._get_sort_fields(sort)
 
-    async def get_cart_with_lock(self, **filters) -> Cart | None:
+    async def get_cart_with_lock(self, read: bool, **filters) -> Cart | None:
         filter_conditions = self._get_filters(**filters)
 
-        res = await self._async_session.execute(
-            select(self.model).where(*filter_conditions).with_for_update()
-        )
+        base_stmt = select(self.model).where(*filter_conditions)
+
+        if read:
+            base_stmt = base_stmt.with_for_update(read=True)
+        else:
+            base_stmt = base_stmt.with_for_update()
+
+        res = await self._async_session.execute(base_stmt)
         return res.scalar()

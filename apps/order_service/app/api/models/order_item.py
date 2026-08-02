@@ -28,10 +28,10 @@ class OrderItem(Base):
         ForeignKey("products.id", name="order_items_product_id_fk", ondelete="CASCADE"),
     )
     quantity: Mapped[int] = mapped_column(
-        Integer, CheckConstraint("quantity > 1", name="products_quantity_ck")
+        Integer, CheckConstraint("quantity > 0", name="products_quantity_ck")
     )
-    price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
-    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
+    price: Mapped[Decimal] = mapped_column(Numeric(precision=4))
+    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=4))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

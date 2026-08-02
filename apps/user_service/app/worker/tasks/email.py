@@ -6,13 +6,13 @@ from resend.exceptions import ResendError
 from datetime import datetime, timezone, timedelta
 
 
+from shared.worker.celery_app import celery_app
 from shared.worker.services import get_redis_repo
 from shared.core.exceptions import MaxRetriesError
 from shared.worker.tasks.base import BaseTaskWithFailure
 from apps.user_service.app.api.models.email import Email
 from shared.core.shared_config import get_global_settings
 from apps.user_service.app.api.schemas.auth import OtpInDB
-from apps.user_service.app.worker.celery_app import celery_app
 from apps.user_service.app.core.config import get_user_settings
 from apps.user_service.app.worker.services import get_otp_service
 

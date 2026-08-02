@@ -11,13 +11,18 @@ class Request:
     def __init__(self, async_client: httpx.AsyncClient = None):
         self._async_client = async_client
 
+    RETRY_FOR = (
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.WriteError,
+        httpx.ReadError,
+    )
+
     @retry(
         reraise=True,
         stop=stop_after_attempt(3),
         wait=wait_exponential_jitter(max=15, jitter=5),
-        retry=retry_if_exception_type(
-            httpx.ConnectError, httpx.ConnectTimeout, httpx.WriteError, httpx.ReadError
-        ),
+        retry=retry_if_exception_type(RETRY_FOR),
     )
     async def get(
         self, url: str, params: dict = None, headers: dict = None, cookies: dict = None

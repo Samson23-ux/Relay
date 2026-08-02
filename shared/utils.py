@@ -4,7 +4,7 @@ from uuid import UUID
 from binascii import Error as BinasciiError
 
 
-from shared.worker.tasks.log import save_log
+from shared.worker.tasks.log import save_log, update_log
 
 
 async def encode_data(payload: dict) -> str:
@@ -23,28 +23,61 @@ async def decode_string(cursor_string: str, curr_order: str) -> dict:
         if cursor_payload["order"] != curr_order.lower():
             return
         return cursor_payload
-    except (json.JSONDecodeError, UnicodeDecodeError, BinasciiError):
+    except json.JSONDecodeError, UnicodeDecodeError, BinasciiError:
         return
-    
 
-def log_info(message: str, request_meta: dict, circuit: dict, user_id: UUID | None = None):
+
+def get_message_meta(request_meta: dict, upstream: str) -> dict:
+    message_meta: dict = {
+        "trace_id": request_meta.get("trace_id"),
+        "span_id": request_meta.get("span_id"),
+        "parent_span_id": request_meta.get("parent_span_id"),
+        "user_id": str(request_meta.get("user_id"))
+    }
+
+    message_meta["upstream"] = upstream
+    return message_meta
+
+
+def log_info(
+    message: str,
+    request_meta: dict,
+    circuit: dict | None = None,
+    user_id: UUID | None = None,
+):
     request_meta["message"] = message
 
     if user_id:
         request_meta["user_id"] = str(user_id)
 
-    circuit_state = circuit.get("state")
-    request_meta["circuit_open"] = True if circuit_state == "open" else False
-    save_log.apply_async(priority=3, kwargs=request_meta)
+    if circuit:
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+    save_log.apply_async(priority=3, kwargs={"payload": request_meta})
 
 
-def log_error(message: str, request_meta: dict, circuit: dict, user_id: UUID | None = None):
+def log_error(
+    message: str,
+    request_meta: dict,
+    circuit: dict | None = None,
+    user_id: UUID | None = None,
+):
     request_meta["message"] = message
     request_meta["log_level"] = "error"
-    
+
     if user_id:
         request_meta["user_id"] = str(user_id)
 
-    circuit_state = circuit.get("state")
-    request_meta["circuit_open"] = True if circuit_state == "open" else False
-    save_log.apply_async(priority=3, kwargs=request_meta)
+    if circuit:
+        circuit_state = circuit.get("state")
+        request_meta["circuit_open"] = True if circuit_state == "open" else False
+
+    save_log.apply_async(priority=3, kwargs={"payload": request_meta})
+
+
+def update_db_log(span_id: str, trace_id: str, payload: dict):
+    update_log.apply_async(
+        priority=3,
+        kwargs={"span_id": span_id, "trace_id": trace_id, "payload": payload},
+    )

@@ -5,6 +5,7 @@ from sqlalchemy import func, select, Sequence
 from shared.repo.base_repo import BaseRepository
 from apps.product_service.app.api.models.product import Product
 from apps.product_service.app.api.schemas.product import ProductBase
+from apps.product_service.app.api.models.product_reserve import ProductReserve
 
 
 class ProductRepository(BaseRepository[ProductBase, Product]):
@@ -39,8 +40,23 @@ class ProductRepository(BaseRepository[ProductBase, Product]):
         res = await self._async_session.execute(select(self.model).limit(limit))
         return res.scalars().all()
 
-    async def get_product_with_lock(self, id: UUID) -> Product | None:
-        res = await self._async_session.execute(
-            select(self.model).where(self.model.id == id).with_for_update()
+    def get_product_with_lock(self, read: bool, id: UUID) -> Product | None:
+        base_stmt = select(self.model).where(self.model.id == id)
+
+        if read:
+            base_stmt = base_stmt.with_for_update(read=True)
+        else:
+            base_stmt = base_stmt.with_for_update()
+
+        res = self._sync_session.execute(base_stmt)
+        return res.scalar()
+
+    def get_product_total_reserve(self, product_id: UUID) -> int | None:
+        stmt = (
+            select(func.sum(ProductReserve.reserve))
+            .select_from(self.model)
+            .join(ProductReserve)
+            .where(self.model.id == product_id)
         )
+        res = self._sync_session.execute(stmt)
         return res.scalar()

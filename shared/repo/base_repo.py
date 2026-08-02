@@ -24,6 +24,22 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     model: type[SqlalchemyModel]
 
+    @property
+    def async_session(self):
+        return self._async_session
+
+    @async_session.setter
+    def async_session(self, session):
+        self._async_session = session
+
+    @property
+    def sync_session(self):
+        return self._sync_session
+
+    @sync_session.setter
+    def sync_session(self, session):
+        self._sync_session = session
+
     def add(
         self, entity: Optional[Entity] = None, model: Optional[SqlalchemyModel] = None
     ):

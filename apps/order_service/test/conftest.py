@@ -1,11 +1,10 @@
 import pytest_asyncio
-from uuid import uuid7
 from sqlalchemy import text
+from uuid import uuid7, UUID
 from redis.asyncio import Redis
+from unittest.mock import patch
 from sqlalchemy.pool import NullPool
-from datetime import datetime, timezone
 from asgi_lifespan import LifespanManager
-from unittest.mock import patch, MagicMock, AsyncMock
 from httpx import AsyncClient, ASGITransport, Response
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -19,13 +18,11 @@ from sqlalchemy.ext.asyncio import (
 
 from shared.models.base import Base
 from apps.order_service.app.main import app
-from shared.services.request import Request
 from apps.user_service.app.api.models.user import User
 from shared.database.shared_session import get_session
 from shared.core.shared_config import get_global_settings
 from apps.order_service.app.api import models  # noqa: F401
-from apps.order_service.app.deps import get_request_service
-from apps.product_service.app.api.schemas.product import ProductResponse
+from apps.product_service.app.api.models.product import Product  # noqa: F401
 from shared.shared_deps import get_redis_client, request_metadata, get_current_user
 
 
@@ -34,6 +31,74 @@ async def async_engine():
     async_db_engine: AsyncEngine = create_async_engine(
         url=get_global_settings().ASYNC_TEST_DB_URL, poolclass=NullPool
     )
+
+    user_stmt = """
+        INSERT INTO users (
+        id,
+        type,
+        role,
+        email,
+        hashed_password,
+        is_active,
+        is_verified,
+        created_at
+        )
+        VALUES
+        (
+            '019fbd28-ea23-76ef-b14a-64a857bc11f3',
+            'email',
+            'user',
+            'user@example.com',
+            'test_user_password',
+            'true',
+            'true',
+            NOW()
+        );
+    """
+
+    prd_1_stmt = """
+        INSERT INTO products (
+        id,
+        name,
+        description,
+        serial,
+        price,
+        quantity,
+        created_at
+        )
+        VALUES
+        (
+            '019fb2f7-2003-74d1-91fb-79bcb506c77f',
+            'test_product',
+            'This is a fake test product.',
+            'EumHUV41owYwmnzpjVKYng',
+            '50.00',
+            '50',
+            NOW()
+        );
+    """
+
+    prd_2_stmt = """
+        INSERT INTO products (
+        id,
+        name,
+        description,
+        serial,
+        price,
+        quantity,
+        created_at
+        )
+        VALUES
+        (
+            '019fbd53-b8da-75fc-904e-b1d70c2e2c6e',
+            'test_product_1',
+            'This is a fake test product.',
+            'L9ZWvaU24w42iqYNQKv1Vw',
+            '50.00',
+            '50',
+            NOW()
+        );
+    """
 
     async with async_db_engine.begin() as conn:
         await conn.execute(text("""
@@ -59,6 +124,9 @@ async def async_engine():
                 $$;
         """))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text(user_stmt))
+        await conn.execute(text(prd_1_stmt))
+        await conn.execute(text(prd_2_stmt))
 
     yield async_db_engine
 
@@ -109,51 +177,13 @@ async def flush_redis(test_redis_client: Redis):
     await test_redis_client.flushdb()
 
 
-def get_product_1() -> tuple[ProductResponse]:
-    prd_1: ProductResponse = ProductResponse(
-        id=uuid7(),
-        name="test_product",
-        description="This is a fake test product.",
-        serial="EumHUV41owYwmnzpjVKYng",
-        price="50.00",
-        quantity="15",
-        created_at=datetime.now(timezone.utc),
-        updated_at=None
-    )
-
-    prd_2: ProductResponse = ProductResponse(
-        id=uuid7(),
-        name="test_product_1",
-        description="This is a fake test product.",
-        serial="aJPqCYM00MaZ6kCy2ytQ",
-        price="80.00",
-        quantity="10",
-        created_at=datetime.now(timezone.utc),
-        updated_at=None
-    )
-
-    return prd_1, prd_2
-
-
-async def mock_request_service() -> MagicMock:
-    response = AsyncMock()
-    request = MagicMock(spec=Request)
-
-    prd_1, prd_2 = get_product_1()
-
-    response.json.side_effects = [{"data": prd_1}, {"data": prd_2}]
-    request.get.return_value = response
-
-    return request
-
-
 @pytest_asyncio.fixture
 async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     async def get_test_session():
         return async_session
 
     fake_user = User(
-        id=uuid7(),
+        id=UUID("019fbd28-ea23-76ef-b14a-64a857bc11f3"),
         type="email",
         role="admin",
         email="user@example.com",
@@ -162,9 +192,8 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
     app.dependency_overrides[get_session] = get_test_session
     app.dependency_overrides[get_current_user] = lambda: fake_user
-    app.dependency_overrides[get_request_service] = mock_request_service
     app.dependency_overrides[get_redis_client] = lambda: test_redis_client
-    app.dependency_overrides[request_metadata] = lambda: {"upstream": "test"}
+    app.dependency_overrides[request_metadata] = lambda: {"upstream_instance": "test"}
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -177,12 +206,21 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
 @pytest_asyncio.fixture(autouse=True)
 async def mock_log_task():
-    with patch("shared.utils.save_log.apply_async"):
+    with (
+        patch("shared.utils.save_log.apply_async") as create_log_mock,
+        patch("shared.utils.update_log.apply_async") as update_log_mock,
+    ):
         yield
+
+    # create_log_mock.assert_called()
+    # update_log_mock.assert_called()
 
 
 @pytest_asyncio.fixture
 async def create_cart(async_client: AsyncClient) -> Response:
-    cart_item: dict = {"product_id": uuid7(), "quantity": 2}
+    cart_item: dict = {
+        "product_id": "019fb2f7-2003-74d1-91fb-79bcb506c77f",
+        "quantity": 2,
+    }
     res: Response = await async_client.post("/carts", json=cart_item)
     return res

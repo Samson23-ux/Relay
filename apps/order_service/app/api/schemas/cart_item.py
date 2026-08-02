@@ -11,7 +11,6 @@ class CartItemBase(BaseModel):
     quantity: int
     price: Decimal = Field(..., decimal_places=2)
     total_price: Decimal = Field(..., decimal_places=2)
-    created_at: datetime
 
 
 class CartItemInDB(CartItemBase):
@@ -23,3 +22,4 @@ class CartItemResponse(CartItemBase):
     model_config = ConfigDict(from_attributes=True)
 
     product: ProductItem
+    created_at: datetime

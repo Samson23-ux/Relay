@@ -11,7 +11,6 @@ class OrderBase(BaseModel):
     id: UUID
     user_id: UUID
     reference_id: UUID
-    created_at: datetime
 
 
 class OrderInDB(OrderBase):
@@ -24,3 +23,4 @@ class OrderResponse(OrderBase):
 
     status: OrderStatus
     total_price: Decimal
+    created_at: datetime

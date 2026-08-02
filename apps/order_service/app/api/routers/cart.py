@@ -1,13 +1,13 @@
 from uuid import UUID
+from typing import Annotated
 from fastapi import APIRouter, Query
-from typing import Annotated, Optional
 
 
-from shared.shared_deps import CurrUserDep, RequestMetaData
-from apps.order_service.app.deps import HTTPRequestDep, CartServiceDep
-from shared.schemas.response import SuccessResponse, AllSuccessResponse
-from apps.order_service.app.api.schemas.cart_items import CartItemResponse
+from shared.schemas.response import SuccessResponse
+from apps.order_service.app.api.schemas.cart_item import CartItemResponse
+from apps.order_service.app.deps import CartServiceDep, CartItemServiceDep
 from apps.order_service.app.api.schemas.cart import CartResponse, AddToCart
+from shared.shared_deps import CurrUserDep, RequestMetaData, UnitOfWorkRepo
 
 router = APIRouter()
 
@@ -22,9 +22,13 @@ async def get_carts(
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
+    cart_item_service: CartItemServiceDep,
     items: Annotated[bool, Query(description="Return cart with items.")] = False,
 ):
-    pass
+    carts: list[CartResponse | CartItemResponse] = await cart_service.get_carts(
+        items, curr_user, request_meta, cart_item_service
+    )
+    return SuccessResponse(message="Carts retrieved successfully", data=carts)
 
 
 @router.get(
@@ -34,12 +38,17 @@ async def get_carts(
     description="Get cart by id",
 )
 async def get_cart_by_id(
+    id: UUID,
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
+    cart_item_service: CartItemServiceDep,
     items: Annotated[bool, Query(description="Return cart with items.")] = False,
 ):
-    pass
+    cart: CartResponse | list[CartItemResponse] = await cart_service.get_cart_by_id(
+        id, items, curr_user, request_meta, cart_item_service
+    )
+    return SuccessResponse(message="Cart retrieved successfully", data=cart)
 
 
 @router.post(
@@ -49,48 +58,87 @@ async def get_cart_by_id(
     description="Create a new cart or add to an existing cart by providing its id",
 )
 async def create_cart(
+    uow: UnitOfWorkRepo,
     cart_item: AddToCart,
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
-    request_service: HTTPRequestDep,
     cart_id: Annotated[UUID, Query(description="Id of an existing cart")] = None,
 ):
-    pass
+    cart: CartResponse = await cart_service.create_cart(
+        curr_user, request_meta, cart_item, cart_id, uow
+    )
+    return SuccessResponse(message="Cart created successfully", data=cart)
+
+
+@router.patch(
+    "/carts/{cart_id}/products/{product_id}/remove",
+    status_code=200,
+    response_model=SuccessResponse[CartResponse | list],
+    description="Remove item from cart. Cart gets deleted if there are no more items",
+)
+async def remove_cart_item(
+    cart_id: UUID,
+    product_id: UUID,
+    uow: UnitOfWorkRepo,
+    curr_user: CurrUserDep,
+    cart_service: CartServiceDep,
+    request_meta: RequestMetaData,
+):
+    cart: CartResponse | list = await cart_service.remove_item(
+        cart_id, product_id, curr_user, request_meta, uow
+    )
+    return SuccessResponse(message="Cart item removed successfully", data=cart)
 
 
 @router.patch(
     "/carts/{cart_id}/products/{product_id}/increment",
     status_code=200,
-    response_model=SuccessResponse[CartResponse],
+    response_model=SuccessResponse[CartItemResponse],
     description="Increment a product in a cart",
 )
 async def increment_cart_item(
     cart_id: UUID,
     product_id: UUID,
+    uow: UnitOfWorkRepo,
     quantity: Annotated[int, Query(..., description="Quantity of product")],
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
-    pass
+    cart_items: CartItemResponse = await cart_service.increment_item(
+        cart_id, product_id, quantity, curr_user, request_meta, uow
+    )
+    return SuccessResponse(
+        message="Cart item incremented successfully", data=cart_items
+    )
 
 
 @router.patch(
     "/carts/{cart_id}/products/{product_id}/decrement",
     status_code=200,
-    response_model=SuccessResponse[CartResponse],
-    description="Decrement a product in a cart",
+    response_model=SuccessResponse[CartItemResponse | list],
+    description=(
+        "Decrement a product in a cart."
+        "The cart item is deleted if the quantity falls below 1."
+        "Cart gets deleted if there are no more items"
+    ),
 )
 async def decrement_cart_item(
     cart_id: UUID,
     product_id: UUID,
+    uow: UnitOfWorkRepo,
     quantity: Annotated[int, Query(..., description="Quantity of product")],
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
-    pass
+    cart_items: CartItemResponse | list = await cart_service.decrement_item(
+        cart_id, product_id, quantity, curr_user, request_meta, uow
+    )
+    return SuccessResponse(
+        message="Cart item decremented successfully", data=cart_items
+    )
 
 
 @router.delete(
@@ -104,4 +152,4 @@ async def delete_cart(
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
-    pass
+    await cart_service.delete_cart(id, curr_user, request_meta)

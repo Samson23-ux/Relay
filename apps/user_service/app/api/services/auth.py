@@ -126,7 +126,7 @@ class AuthService:
         user_email: str = email_login.email
         hashed_password: str = await security.hash_password(email_login.password)
 
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email
@@ -192,7 +192,7 @@ class AuthService:
         security: Security,
     ) -> tuple[str]:
         user_info: dict = payload.get("userinfo")
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         google_id: str = user_info.get("sub")
         user_email: str = user_info.get("email")
@@ -234,11 +234,11 @@ class AuthService:
         # close active sessions
         await self._otp_repo.aclose()
 
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         self._uow = uow
-        self._user_repo = UserRepository(self._uow._session)
-        self._otp_repo._async_session = self._uow._session
+        self._user_repo = UserRepository(self._uow.session)
+        self._otp_repo.async_session = self._uow.session
 
         user_email: str = email_verify.email
 
@@ -295,7 +295,7 @@ class AuthService:
         email_service: EmailService,
     ):
         user_email: str = otp_resend.email
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email, is_verified=False
@@ -352,7 +352,7 @@ class AuthService:
         security: Security,
     ):
         user_email: str = email_login.email
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         existing_user: User | None = await user_service._get_user_by_email(
             email=user_email, is_verified=True, is_deactivated=False
@@ -390,7 +390,7 @@ class AuthService:
     async def create_auth_tokens(
         self, request_meta: dict, refresh_token: str, security: Security
     ):
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
         user_email, user_type = await self._revoke_refresh_token(
             circuit_key, request_meta, refresh_token, security
         )
@@ -407,7 +407,7 @@ class AuthService:
     async def get_current_user(
         self, request_meta: dict, curr_user: User
     ) -> EmailUserResponse | GoogleUserResponse:
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         if curr_user.type == "email":
             user_email: str = curr_user.email
@@ -432,7 +432,7 @@ class AuthService:
         security: Security,
         user_service: UserService,
     ):
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         request_meta["user_id"] = curr_user.id
         user_email: str = get_user_email(curr_user)
@@ -458,7 +458,7 @@ class AuthService:
         user_service: UserService,
     ):
         user_email: str = get_user_email(curr_user)
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         request_meta["user_id"] = curr_user.id
         await user_service.delete_user(circuit_key, request_meta, curr_user)

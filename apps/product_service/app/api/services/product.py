@@ -6,9 +6,13 @@ from sqlalchemy import Sequence
 from shared.utils import log_info, log_error
 from shared.repo.redis import RedisRepository
 from shared.core.exceptions import ServerError
+from shared.repo.uow import UnitOfWorkRepository
 from apps.user_service.app.api.models.user import User
 from apps.product_service.app.api.models.product import Product
 from apps.product_service.app.api.repo.product import ProductRepository
+from apps.product_service.app.api.models.product_reserve import ProductReserve
+from apps.product_service.app.api.schemas.product_reserve import ProductReserveBase
+from apps.product_service.app.api.repo.product_reserve import ProductReserveRepository
 from apps.product_service.app.api.schemas.product import (
     ProductInDB,
     ProductCreate,
@@ -25,9 +29,16 @@ from apps.product_service.app.core.exceptions import (
 
 
 class ProductService:
-    def __init__(self, product_repo: ProductRepository, redis_repo: RedisRepository):
+    def __init__(
+        self,
+        product_repo: ProductRepository,
+        reserve_repo: ProductReserveRepository,
+        redis_repo: RedisRepository,
+    ):
+        self._uow = None
         self._redis_repo = redis_repo
         self._product_repo = product_repo
+        self._reserve_repo = reserve_repo
 
     async def _get_product(self, name: str) -> Product | None:
         return await self._product_repo.get_record(name=name)
@@ -36,7 +47,7 @@ class ProductService:
         self, curr_user: User, request_meta: dict
     ) -> list[ProductResponse]:
         request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         try:
             cached_products: str = await self._redis_repo.get_key("page:products")
@@ -100,7 +111,7 @@ class ProductService:
         cursor: str | None,
     ) -> dict:
         request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         try:
             res: dict = await self._product_repo.get_records(sort, order, cursor, limit)
@@ -137,7 +148,7 @@ class ProductService:
         self, id: UUID, curr_user: User, request_meta: dict
     ) -> ProductResponse:
         request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         try:
             product_db: Product | None = await self._product_repo.get_record(id=id)
@@ -164,60 +175,157 @@ class ProductService:
             log_error(message, request_meta, circuit)
             raise ServerError() from exc
 
-    async def reserve_product(
-        self, id: UUID, quantity: int, curr_user: User, request_meta: dict
-    ) -> ProductResponse:
-        request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
-
+    def _get_sync_product(self, id: UUID, request_meta: dict):
         try:
-            product_db: Product | None = await self._product_repo.get_product_with_lock(
-                id=id
-            )
+            product_db: Product | None = self._product_repo.get_sync_record(id=id)
 
             if not product_db:
                 message = f"Product not found with id: {id}"
-                circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-                log_error(message, request_meta, circuit)
+                log_error(message, request_meta)
                 raise ProductNotFoundError(id=id)
-
-            if product_db.quantity < 1:
-                message = f"Product out of stock. Id: {id}"
-                circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-                log_error(message, request_meta, circuit)
-                raise OutOfStockError(id=id)
-
-            if product_db.quantity < quantity:
-                message = f"Product stock not enough. Id: {id}"
-                circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-                log_error(message, request_meta, circuit)
-                raise NotEnoughStockError(id=id)
-
-            product_db.quantity -= quantity
-
-            self._product_repo.add(model=product_db)
-            await self._product_repo.commit()
-
-            return ProductResponse.model_validate(product_db)
+            return product_db
         except Exception as exc:
-            await self._product_repo.rollback()
-
             if isinstance(exc, ProductNotFoundError):
                 raise ProductNotFoundError(id=id)
+
+            message = (
+                f"Error occured while retrieving product for cart. Error: {str(exc)}"
+            )
+
+            log_error(message, request_meta)
+            raise ServerError() from exc
+
+    def reserve_product(
+        self,
+        order_id: UUID,
+        product_id: UUID,
+        quantity: int,
+        request_meta: dict,
+        uow: UnitOfWorkRepository,
+    ):
+        # close existing sessions
+        self._product_repo.close()
+        self._reserve_repo.close()
+
+        self._uow = uow
+        self._product_repo.sync_session = self._uow.sync_session
+        self._reserve_repo.sync_session = self._uow.sync_session
+
+        try:
+            product_db: Product | None = self._product_repo.get_product_with_lock(
+                True, id=product_id
+            )
+
+            if not product_db:
+                message = f"Product not found with id: {product_id}"
+                log_error(message, request_meta)
+                raise ProductNotFoundError(id=product_id)
+
+            if product_db.quantity < 1:
+                message = f"Product out of stock. Id: {product_id}"
+                log_error(message, request_meta)
+                raise OutOfStockError(id=product_id)
+
+            total_reserve: int | None = self._product_repo.get_product_total_reserve(
+                product_id
+            )
+
+            if total_reserve:
+                if product_db.quantity - total_reserve < quantity:
+                    message = f"Product stock not enough. Id: {product_id}"
+                    log_error(message, request_meta)
+                    raise NotEnoughStockError(id=product_id)
+
+            product_reserve = ProductReserveBase(
+                order_id=order_id, product_id=product_id, reserve=quantity
+            )
+
+            self._reserve_repo.reserve_product(product_reserve)
+            self._uow.sync_commit()
+
+            message = "Product reserved successfully"
+            log_info(message, request_meta)
+        except Exception as exc:
+            self._uow.sync_rollback()
+
+            if isinstance(exc, ProductNotFoundError):
+                raise ProductNotFoundError(product_id)
             elif isinstance(exc, OutOfStockError):
-                raise OutOfStockError(id=id)
+                raise OutOfStockError(id=product_id)
             elif isinstance(exc, NotEnoughStockError):
-                raise NotEnoughStockError(id=id)
+                raise NotEnoughStockError(id=product_id)
 
             message = (
                 f"Error occured while reserving product for orders. Error: {str(exc)}"
             )
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+            log_error(message, request_meta)
+            raise ServerError() from exc
 
-            log_error(message, request_meta, circuit)
+    def release_reserve(self, order_id: UUID, product_id: UUID, request_meta: dict):
+        try:
+            product_reserve: ProductReserve | None = (
+                self._reserve_repo.get_product_reserve(order_id, product_id)
+            )
+
+            if product_reserve:
+                self._reserve_repo.sync_delete(product_reserve)
+                self._reserve_repo.sync_commit()
+
+            message = "Product reserved released successfully"
+            log_info(message, request_meta)
+        except Exception as exc:
+            self._reserve_repo.sync_rollback()
+
+            message = f"Error occured while releasing product reserve for orders. Error: {str(exc)}"
+            log_error(message, request_meta)
+            raise ServerError() from exc
+
+    def confirm_reserve(
+        self,
+        order_id: UUID,
+        product_id: UUID,
+        request_meta: dict,
+        uow: UnitOfWorkRepository,
+    ):
+        # close existing sessions
+        self._product_repo.close()
+        self._reserve_repo.close()
+
+        self._uow = uow
+        self._product_repo.sync_session = self._uow.sync_session
+        self._reserve_repo.sync_session = self._uow.sync_session
+
+        try:
+            product_db: Product | None = self._product_repo.get_product_with_lock(
+                False, id=product_id
+            )
+
+            if not product_db:
+                message = f"Product not found with id: {product_id}"
+                log_error(message, request_meta)
+                raise ProductNotFoundError(id=product_id)
+
+            product_reserve: ProductReserve | None = (
+                self._reserve_repo.get_product_reserve(order_id, product_id)
+            )
+
+            product_db.quantity -= product_reserve.reserve
+
+            self._product_repo.sync_add(model=product_db)
+            self._reserve_repo.sync_delete(model=product_reserve)
+
+            self._product_repo.sync_commit()
+
+            message = "Product reserved confirmed successfully"
+            log_info(message, request_meta)
+        except Exception as exc:
+            self._uow.sync_rollback()
+
+            if isinstance(exc, ProductNotFoundError):
+                raise ProductNotFoundError(id=product_id)
+
+            message = f"Error occured while confirming product reserve for orders. Error: {str(exc)}"
+            log_error(message, request_meta)
             raise ServerError() from exc
 
     async def create_product(
@@ -225,7 +333,7 @@ class ProductService:
     ) -> ProductResponse:
         request_meta["user_id"] = curr_user.id
         product_name: str = product_create.name
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         product_exists: Product | None = await self._get_product(product_name)
 
@@ -264,7 +372,7 @@ class ProductService:
         product_update: ProductUpdate,
     ) -> ProductResponse:
         request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         try:
             product_db: Product | None = await self._product_repo.get_record(id=id)
@@ -310,7 +418,7 @@ class ProductService:
         request_meta: dict,
     ):
         request_meta["user_id"] = curr_user.id
-        circuit_key: str = f"circuit:{request_meta.get("upstream")}"
+        circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         try:
             product_db: Product | None = await self._product_repo.get_record(id=id)

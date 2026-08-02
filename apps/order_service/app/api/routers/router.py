@@ -6,5 +6,5 @@ from shared.core.shared_config import get_global_settings
 
 GlOBAL_SETTINGS = get_global_settings()
 
-router = APIRouter(tags=GlOBAL_SETTINGS.API_PREFIX)
+router = APIRouter(prefix=GlOBAL_SETTINGS.API_PREFIX)
 router.include_router(cart.router, tags=["Cart"])

@@ -50,6 +50,7 @@ async def request_metadata(request: Request) -> dict:
         "parent_span_id": request.state.parent_span_id,  # set by a middleware layer
         "client_ip": request.headers.get("x-forwarded-for").split(",")[-1],
         "upstream": request.headers.get("x-upstream"),
+        "upstream_instance": request.headers.get("x-upstream-instance"),
         "upstream_url": request.url,
         "method": request.method,
         "path": request.url.path,

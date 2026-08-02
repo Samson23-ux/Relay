@@ -6,8 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class CartBase(BaseModel):
     id: UUID
     user_id: UUID
-    items: int
-    created_at: datetime
+    items: int = 1
 
 
 class CartInDB(CartBase):
@@ -21,3 +20,5 @@ class AddToCart(BaseModel):
 
 class CartResponse(CartBase):
     model_config = ConfigDict(from_attributes=True)
+
+    created_at: datetime

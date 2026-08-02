@@ -37,6 +37,8 @@ class LogLevel(str, enum.Enum):
 class Log(Base):
     __tablename__ = "logs"
 
+    """HTTP and Message queue logs"""
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID, server_default=text("uuid_generate_v7()")
     )
@@ -46,22 +48,23 @@ class Log(Base):
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID, ForeignKey("users.id", name="logs_user_id_fk", ondelete="CASCADE")
     )
-    client_ip: Mapped[str] = mapped_column(INET)
+    client_ip: Mapped[str | None] = mapped_column(INET)
     upstream: Mapped[enum.Enum] = mapped_column(
         Enum(UpstreamType, values_callable=lambda e: [m.value for m in e])
     )
+    upstream_instance: Mapped[str | None] = mapped_column(String)
     upstream_url: Mapped[str | None] = mapped_column(String)
     message: Mapped[str] = mapped_column(String)
     log_level: Mapped[enum.Enum] = mapped_column(
         Enum(LogLevel, values_callable=lambda e: [m.value for m in e]),
-        default=LogLevel.INFO
+        default=LogLevel.INFO,
     )
-    method: Mapped[str] = mapped_column(String)
-    path: Mapped[str] = mapped_column(String)
+    method: Mapped[str | None] = mapped_column(String)
+    path: Mapped[str | None] = mapped_column(String)
     status_code: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
-    circuit_open: Mapped[bool] = mapped_column(Boolean)
-    rate_limited: Mapped[bool] = mapped_column(Boolean, default=False)
+    circuit_open: Mapped[bool | None] = mapped_column(Boolean)
+    rate_limited: Mapped[bool | None] = mapped_column(Boolean, default=False)
     retries: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

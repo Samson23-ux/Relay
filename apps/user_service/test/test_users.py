@@ -1,7 +1,6 @@
 import httpx
 import pytest
 import secrets
-import pytest_asyncio
 from uuid import uuid4
 from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -10,12 +9,6 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from apps.user_service.app.main import app
 from apps.user_service.app.deps import get_security
 from apps.user_service.app.core.security import Security
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def mock_log_task():
-    with patch("shared.utils.save_log.apply_async"):
-        yield
 
 
 def get_security_mock():

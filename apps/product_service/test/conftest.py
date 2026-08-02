@@ -134,8 +134,10 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
 @pytest_asyncio.fixture(autouse=True)
 async def mock_log_task():
-    with patch("shared.utils.save_log.apply_async"):
+    with patch("shared.utils.save_log.apply_async") as log_mock:
         yield
+
+    log_mock.assert_called()
 
 
 @pytest_asyncio.fixture

@@ -15,15 +15,16 @@ class LogCreate(LogBase):
     span_id: UUID
     parent_span_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
-    client_ip: str
+    client_ip: Optional[str] = None
     upstream: UpstreamType
-    upstream_url: str
+    upstream_instance: Optional[str] = None
+    upstream_url: Optional[str] = None
     message: str
     log_level: LogLevel = LogLevel.INFO
-    method: str
-    path: str
-    circuit_open: bool = False
-    rate_limited: bool = False
+    method: Optional[str] = None
+    path: Optional[str] = None
+    circuit_open: Optional[bool] = None
+    rate_limited: Optional[bool] = None
 
 
 class LogUpdate(LogBase):

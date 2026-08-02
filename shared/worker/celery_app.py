@@ -20,5 +20,11 @@ celery_app = Celery(
     backend=SETTINGS.REDIS_URL,
 )
 
+tasks = [
+    "shared.worker.tasks.log",
+    "apps.user_service.app.worker.tasks.email",
+    "apps.product_service.app.worker.tasks.product",
+]
+
 celery_app.config_from_object("shared.worker.celeryconfig")
-celery_app.autodiscover_tasks("shared.worker.tasks.log")
+celery_app.autodiscover_tasks(tasks)

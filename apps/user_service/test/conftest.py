@@ -116,7 +116,7 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
     app.dependency_overrides[get_session] = get_test_session
     app.dependency_overrides[get_redis_client] = lambda: test_redis_client
-    app.dependency_overrides[request_metadata] = lambda: {"upstream": "test"}
+    app.dependency_overrides[request_metadata] = lambda: {"upstream_instance": "test"}
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -142,7 +142,6 @@ async def create_user(async_client: AsyncClient):
         res: Response = await async_client.post(
             "/auth/signup",
             json=sign_up_payload,
-
         )
 
     email_patch.assert_called_once()
@@ -200,3 +199,9 @@ async def login(async_client: AsyncClient, verify_user: Response):
     )
 
     return res
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def mock_log_task():
+    with patch("shared.utils.save_log.apply_async"):
+        yield
