@@ -195,78 +195,10 @@ class ProductService:
             log_error(message, request_meta)
             raise ServerError() from exc
 
-    # def reserve_product(
-    #     self,
-    #     order_id: UUID,
-    #     product_id: UUID,
-    #     quantity: int,
-    #     request_meta: dict,
-    #     uow: UnitOfWorkRepository,
-    # ):
-    #     # close existing sessions
-    #     self._product_repo.close()
-    #     self._reserve_repo.close()
-
-    #     self._uow = uow
-    #     self._product_repo.sync_session = self._uow.sync_session
-    #     self._reserve_repo.sync_session = self._uow.sync_session
-
-    #     try:
-    #         product_db: Product | None = self._product_repo.get_product_with_lock(
-    #             True, id=product_id
-    #         )
-
-    #         if not product_db:
-    #             message = f"Product not found with id: {product_id}"
-    #             log_error(message, request_meta)
-    #             raise ProductNotFoundError(id=product_id)
-
-    #         if product_db.quantity < 1:
-    #             message = f"Product out of stock. Id: {product_id}"
-    #             log_error(message, request_meta)
-    #             raise OutOfStockError(id=product_id)
-
-    #         total_reserve: int | None = self._product_repo.get_product_total_reserve(
-    #             product_id
-    #         )
-
-    #         if total_reserve:
-    #             if product_db.quantity - total_reserve < quantity:
-    #                 message = f"Product stock not enough. Id: {product_id}"
-    #                 log_error(message, request_meta)
-    #                 raise NotEnoughStockError(id=product_id)
-
-    #         product_reserve = ProductReserveBase(
-    #             order_id=order_id, product_id=product_id, reserve=quantity
-    #         )
-
-    #         self._reserve_repo.reserve_product(product_reserve)
-    #         self._uow.sync_commit()
-
-    #         message = "Product reserved successfully"
-    #         log_info(message, request_meta)
-
-    #         return product_db
-    #     except Exception as exc:
-    #         self._uow.sync_rollback()
-
-    #         if isinstance(exc, ProductNotFoundError):
-    #             raise ProductNotFoundError(product_id)
-    #         elif isinstance(exc, OutOfStockError):
-    #             raise OutOfStockError(id=product_id)
-    #         elif isinstance(exc, NotEnoughStockError):
-    #             raise NotEnoughStockError(id=product_id)
-
-    #         message = (
-    #             f"Error occured while reserving product for orders. Error: {str(exc)}"
-    #         )
-    #         log_error(message, request_meta)
-    #         raise ServerError() from exc
-
     def reserve_product(
         self,
         order_id: UUID,
-        products: dict[str, int],
+        products: dict[str, int],  # mapping of product_id and quantity to reserve
         request_meta: dict,
         uow: UnitOfWorkRepository,
     ):
@@ -279,7 +211,9 @@ class ProductService:
         self._reserve_repo.sync_session = self._uow.sync_session
 
         try:
-            product_prices: dict[str, str] = {}
+            product_details: dict[str, list[str]] = (
+                {}
+            )  # mapping of product id and list of price and quantity
             for product_id, quantity in products.items():
                 product_db: Product | None = self._product_repo.get_product_with_lock(
                     True, id=product_id
@@ -310,14 +244,17 @@ class ProductService:
                 )
                 self._reserve_repo.reserve_product(product_reserve)
 
-                product_prices[product_id] = str(product_db.price)
+                product_details[product_id] = [
+                    str(product_db.price),
+                    product_db.quantity,
+                ]
 
             self._uow.sync_commit()
 
             message = "Products reserved successfully"
             log_info(message, request_meta)
 
-            return product_prices
+            return product_details
         except Exception as exc:
             self._uow.sync_rollback()
 
@@ -333,25 +270,6 @@ class ProductService:
             )
             log_error(message, request_meta)
             raise ServerError() from exc
-
-    # def release_reserve(self, order_id: UUID, product_id: UUID, request_meta: dict):
-    #     try:
-    #         product_reserve: ProductReserve | None = (
-    #             self._reserve_repo.get_product_reserve(order_id, product_id)
-    #         )
-
-    #         if product_reserve:
-    #             self._reserve_repo.sync_delete(product_reserve)
-    #             self._reserve_repo.sync_commit()
-
-    #         message = "Product reserved released successfully"
-    #         log_info(message, request_meta)
-    #     except Exception as exc:
-    #         self._reserve_repo.sync_rollback()
-
-    #         message = f"Error occured while releasing product reserve for orders. Error: {str(exc)}"
-    #         log_error(message, request_meta)
-    #         raise ServerError() from exc
 
     def release_reserve(self, order_id: UUID, products: list[str], request_meta: dict):
         try:
@@ -372,54 +290,6 @@ class ProductService:
             message = f"Error occured while releasing product reserve for orders. Error: {str(exc)}"
             log_error(message, request_meta)
             raise ServerError() from exc
-
-    # def confirm_reserve(
-    #     self,
-    #     order_id: UUID,
-    #     product_id: UUID,
-    #     request_meta: dict,
-    #     uow: UnitOfWorkRepository,
-    # ):
-    #     # close existing sessions
-    #     self._product_repo.close()
-    #     self._reserve_repo.close()
-
-    #     self._uow = uow
-    #     self._product_repo.sync_session = self._uow.sync_session
-    #     self._reserve_repo.sync_session = self._uow.sync_session
-
-    #     try:
-    #         product_db: Product | None = self._product_repo.get_product_with_lock(
-    #             False, id=product_id
-    #         )
-
-    #         if not product_db:
-    #             message = f"Product not found with id: {product_id}"
-    #             log_error(message, request_meta)
-    #             raise ProductNotFoundError(id=product_id)
-
-    #         product_reserve: ProductReserve | None = (
-    #             self._reserve_repo.get_product_reserve(order_id, product_id)
-    #         )
-
-    #         product_db.quantity -= product_reserve.reserve
-
-    #         self._product_repo.sync_add(model=product_db)
-    #         self._reserve_repo.sync_delete(model=product_reserve)
-
-    #         self._product_repo.sync_commit()
-
-    #         message = "Product reserved confirmed successfully"
-    #         log_info(message, request_meta)
-    #     except Exception as exc:
-    #         self._uow.sync_rollback()
-
-    #         if isinstance(exc, ProductNotFoundError):
-    #             raise ProductNotFoundError(id=product_id)
-
-    #         message = f"Error occured while confirming product reserve for orders. Error: {str(exc)}"
-    #         log_error(message, request_meta)
-    #         raise ServerError() from exc
 
     def confirm_reserve(
         self,

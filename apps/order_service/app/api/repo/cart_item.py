@@ -36,6 +36,17 @@ class CartItemRepository(BaseRepository[CartItemBase, CartItem]):
         res = await self._async_session.execute(stmt)
         return res.scalar()
 
+    async def get_cart_items(self, **filters):
+        filter_conditions = self._get_filters(**filters)
+
+        stmt = (
+            select(self.model.product_id, self.model.quantity)
+            .where(*filter_conditions)
+            .with_for_update()
+        )
+        res = await self._async_session.execute(stmt)
+        return res.all()
+
     async def get_cart_with_items(self, user_id: UUID, **filters):
         filter_conditions = self._get_filters(**filters)
 

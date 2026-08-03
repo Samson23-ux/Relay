@@ -5,7 +5,9 @@ from shared.schemas.response import ErrorResponse
 from shared.core.exceptions import create_exception_handler
 from apps.order_service.app.core.exceptions import (
     CartNotFoundError,
+    OrderNotFoundError,
     CartsNotFoundError,
+    OrdersNotFoundError,
     CartItemNotFoundError,
 )
 
@@ -38,5 +40,21 @@ class OrderExceptionHandler:
             handler=create_exception_handler(
                 status_code=404,
                 initial_detail=ErrorResponse(message="Carts not found!"),
+            ),
+        )
+
+        self._app.add_exception_handler(
+            exc_class_or_status_code=OrdersNotFoundError,
+            handler=create_exception_handler(
+                status_code=404,
+                initial_detail=ErrorResponse(message="Orders not found!"),
+            ),
+        )
+
+        self._app.add_exception_handler(
+            exc_class_or_status_code=OrderNotFoundError,
+            handler=create_exception_handler(
+                status_code=404,
+                initial_detail=ErrorResponse(message="Order not found with id {id}"),
             ),
         )

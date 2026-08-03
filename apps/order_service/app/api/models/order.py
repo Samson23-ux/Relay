@@ -37,7 +37,7 @@ class Order(Base):
     status: Mapped[enum.Enum] = mapped_column(
         Enum(OrderStatus, values_callable=lambda e: [m.value for m in e])
     )
-    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
+    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

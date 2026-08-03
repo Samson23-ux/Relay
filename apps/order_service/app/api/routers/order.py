@@ -10,7 +10,6 @@ from shared.shared_deps import CurrUserDep, RequestMetaData, UnitOfWorkRepo
 from apps.order_service.app.api.schemas.order_item import OrderItemResponse
 from apps.order_service.app.deps import OrderServiceDep, OrderItemServiceDep
 
-
 router = APIRouter()
 
 
@@ -29,7 +28,10 @@ async def get_orders(
     items: Annotated[bool, Query(description="Return orders with items.")] = False,
     order: Annotated[str, Query(description="Order result in asc or desc")] = "asc",
 ):
-    pass
+    orders: list[OrderResponse | OrderItemResponse] = await order_service.get_orders(
+        items, curr_user, order, sort, request_meta, order_item_service
+    )
+    return SuccessResponse(message="Orders retrieved successfully", data=orders)
 
 
 @router.get(
@@ -46,7 +48,10 @@ async def get_order_by_id(
     order_item_service: OrderItemServiceDep,
     items: Annotated[bool, Query(description="Return order with items.")] = False,
 ):
-    pass
+    order: OrderResponse | list[OrderItemResponse] = await order_service.get_order_id(
+        id, items, curr_user, request_meta, order_item_service
+    )
+    return SuccessResponse(message="Order retrieved successfully", data=order)
 
 
 @router.post(
@@ -62,7 +67,10 @@ async def create_order(
     order_service: OrderServiceDep,
     cart_id: Annotated[UUID, Query(..., description="Id of an existing cart")],
 ):
-    pass
+    order: OrderResponse = await order_service.create_order(
+        cart_id, curr_user, request_meta, uow
+    )
+    return SuccessResponse(message="Order created successfully", data=order)
 
 
 @router.delete(
@@ -76,4 +84,4 @@ async def delete_order(
     request_meta: RequestMetaData,
     order_service: OrderServiceDep,
 ):
-    pass
+    await order_service.delete_order(id, curr_user, request_meta)

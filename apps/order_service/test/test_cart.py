@@ -1,32 +1,6 @@
 import httpx
 import pytest
-import pytest_asyncio
 from uuid import UUID, uuid7
-from unittest.mock import patch
-from datetime import datetime, timezone
-
-product = {
-    "id": "019fb2f7-2003-74d1-91fb-79bcb506c77f",
-    "name": "test_product",
-    "description": "This is a fake test product.",
-    "serial": "EumHUV41owYwmnzpjVKYng",
-    "price": "50.00",
-    "quantity": 50,
-    "created_at": datetime.now(timezone.utc).isoformat(),
-    "updated_at": datetime.now(timezone.utc).isoformat(),
-}
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def mock_get_product():
-    with patch(
-        "apps.order_service.app.api.services.cart.get_product.apply_async"
-    ) as prd_mock:
-        prd_mock.return_value = {"span_id": str(uuid7()), "data": product}
-
-        yield
-
-    prd_mock.assert_called()
 
 
 class TestCreateCart:

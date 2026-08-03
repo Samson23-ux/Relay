@@ -33,7 +33,7 @@ async def get_order_item_repo(session: DBSession) -> OrderItemRepository:
 CartRepo = Annotated[CartRepository, Depends(get_cart_repo)]
 OrderRepo = Annotated[OrderRepository, Depends(get_order_repo)]
 CartItemRepo = Annotated[CartItemRepository, Depends(get_cart_item_repo)]
-OrderItemRepo = Annotated[OrderItemRepository, Depends(get_cart_item_repo)]
+OrderItemRepo = Annotated[OrderItemRepository, Depends(get_order_item_repo)]
 
 
 # ------------------ service dependency --------------- #

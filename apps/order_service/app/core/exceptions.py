@@ -11,6 +11,13 @@ class CartNotFoundError(AppException):
         self.id = id
 
 
+class OrderNotFoundError(AppException):
+    """Order not found"""
+
+    def __init__(self, id: UUID):
+        self.id = id
+
+
 class CartItemNotFoundError(AppException):
     """Cart item not found"""
 
@@ -21,5 +28,11 @@ class CartItemNotFoundError(AppException):
 
 class CartsNotFoundError(AppException):
     """Carts not found"""
+
+    pass
+
+
+class OrdersNotFoundError(AppException):
+    """Orders not found"""
 
     pass

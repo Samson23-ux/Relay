@@ -56,8 +56,11 @@ def process_reservation(self, payload: dict, request_meta: dict):
             order_id: str = payload.get("order_id")
             products: dict = payload.get("products")
 
-            request_meta["parent_span_id"] = request_meta.get("span_id")
-            request_meta["span_id"] = str(uuid7())
+            if not request_meta.get("parent_span_id"):
+                # generate a new span_id and set parent_span_id to the current
+                # span_id if invoked first time
+                request_meta["parent_span_id"] = request_meta.get("span_id")
+                request_meta["span_id"] = str(uuid7())
 
             if event == "reserve":
                 res = product_service.reserve_product(

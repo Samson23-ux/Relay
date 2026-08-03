@@ -4,6 +4,7 @@ from uuid import uuid7, UUID
 from redis.asyncio import Redis
 from unittest.mock import patch
 from sqlalchemy.pool import NullPool
+from datetime import datetime, timezone
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient, ASGITransport, Response
 from sqlalchemy.ext.asyncio import (
@@ -204,6 +205,30 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     app.dependency_overrides.clear()
 
 
+product = {
+    "id": "019fb2f7-2003-74d1-91fb-79bcb506c77f",
+    "name": "test_product",
+    "description": "This is a fake test product.",
+    "serial": "EumHUV41owYwmnzpjVKYng",
+    "price": "50.00",
+    "quantity": 50,
+    "created_at": datetime.now(timezone.utc).isoformat(),
+    "updated_at": datetime.now(timezone.utc).isoformat(),
+}
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def mock_get_product():
+    with patch(
+        "apps.order_service.app.api.services.cart.get_product.apply_async"
+    ) as prd_mock:
+        prd_mock.return_value = {"span_id": str(uuid7()), "data": product}
+
+        yield
+
+    prd_mock.assert_called()
+
+
 @pytest_asyncio.fixture(autouse=True)
 async def mock_log_task():
     with (
@@ -211,9 +236,6 @@ async def mock_log_task():
         patch("shared.utils.update_log.apply_async") as update_log_mock,
     ):
         yield
-
-    # create_log_mock.assert_called()
-    # update_log_mock.assert_called()
 
 
 @pytest_asyncio.fixture

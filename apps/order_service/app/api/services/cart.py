@@ -1,5 +1,4 @@
 import time
-from typing import Any
 from uuid import UUID, uuid7
 from sqlalchemy import Sequence
 from celery.exceptions import TimeoutError
@@ -10,6 +9,7 @@ from shared.core.exceptions import ServerError
 from shared.repo.uow import UnitOfWorkRepository
 from apps.user_service.app.api.models.user import User
 from apps.order_service.app.api.models.cart import Cart
+from apps.order_service.app.utils import get_items_response
 from apps.order_service.app.api.repo.cart import CartRepository
 from apps.order_service.app.api.models.cart_item import CartItem
 from apps.product_service.app.worker.tasks.product import get_product
@@ -37,23 +37,6 @@ class CartService:
         self._cart_repo = cart_repo
         self._redis_repo = redis_repo
 
-    def _get_items_response(self, cart_items: list[tuple]):
-        carts = []
-        for item in cart_items:
-            product = ProductItem(
-                id=item[0], name=item[1], description=item[2], serial=item[3]
-            )
-            cart_item = CartItemResponse(
-                product=product,
-                quantity=item[4],
-                price=item[5],
-                total_price=item[6],
-                created_at=item[7],
-            )
-
-            carts.append(cart_item)
-        return carts
-
     def _get_item_response(self, items: list[tuple]):
         (item,) = items
         product = ProductItem(
@@ -68,6 +51,31 @@ class CartService:
         )
 
         return cart_item
+
+    async def _get_cart(self, read: bool, request_meta: dict, **filters):
+        try:
+            cart_id: UUID = filters.get("id")
+            circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
+
+            cart: Cart | None = await self._cart_repo.get_cart_with_lock(
+                read, **filters
+            )
+
+            if not cart:
+                message = f"Cart not found with id {cart_id}"
+                circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+                log_error(message, request_meta, circuit)
+                raise CartNotFoundError(id=cart_id)
+        except Exception as exc:
+            if isinstance(exc, CartNotFoundError):
+                raise CartNotFoundError(id=cart_id)
+
+            message = f"Error occured while retrieving cart with id {cart_id}. Error: {str(exc)}"
+            circuit: dict = await self._redis_repo.get_hset(circuit_key)
+
+            log_error(message, request_meta, circuit)
+            raise ServerError() from exc
 
     async def get_carts(
         self,
@@ -84,7 +92,7 @@ class CartService:
 
         try:
             if items:
-                carts_db = await cart_item_service._get_carts_items(
+                carts_db = await cart_item_service._get_carts_with_items(
                     user_id, sort, order
                 )
 
@@ -95,7 +103,7 @@ class CartService:
                     log_error(message, request_meta, circuit)
                     raise CartsNotFoundError()
 
-                carts = self._get_items_response(carts_db)
+                carts = get_items_response("cart", carts_db)
 
                 message = "User carts retrieved successfully"
                 circuit: dict = await self._redis_repo.get_hset(circuit_key)
@@ -147,7 +155,7 @@ class CartService:
 
         try:
             if items:
-                cart_db = await cart_item_service._get_cart_items(user_id, cart_id=id)
+                cart_db = await cart_item_service._get_cart_with_items(user_id, cart_id=id)
 
                 if not cart_db:
                     message = f"User cart not found with id {id}"
@@ -156,7 +164,7 @@ class CartService:
                     log_error(message, request_meta, circuit)
                     raise CartNotFoundError(id=id)
 
-                carts = self._get_items_response(cart_db)
+                carts = get_items_response("cart", cart_db)
 
                 message = "User cart retrieved successfully"
                 circuit: dict = await self._redis_repo.get_hset(circuit_key)
@@ -219,7 +227,7 @@ class CartService:
         try:
             start_time = time.perf_counter()
             res = get_product.apply_async(
-                priority=3,
+                priority=5,
                 kwargs={
                     "product_id": str(product_id),
                     "request_meta": message_meta,
@@ -461,7 +469,7 @@ class CartService:
             )
             await self._uow.commit()
 
-            cart_items_db = await self._item_service._get_cart_items(
+            cart_items_db = await self._item_service._get_cart_with_items(
                 user_id, cart_id=cart_id, product_id=product_id
             )
             cart_items = self._get_item_response(cart_items_db)
@@ -565,7 +573,7 @@ class CartService:
 
             await self._uow.commit()
 
-            cart_items_db = await self._item_service._get_cart_items(
+            cart_items_db = await self._item_service._get_cart_with_items(
                 user_id, cart_id=cart_id, product_id=product_id
             )
 
@@ -621,9 +629,7 @@ class CartService:
 
             message = "User cart deleted successfully"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
             log_info(message, request_meta, circuit)
-            return CartResponse.model_validate(cart_db)
         except Exception as exc:
             await self._cart_repo.rollback()
 
@@ -631,7 +637,7 @@ class CartService:
                 raise CartNotFoundError(id=id)
 
             message = (
-                f"Error occured while retrieving cart with id {id}. Error: {str(exc)}"
+                f"Error occured while deleting cart with id {id}. Error: {str(exc)}"
             )
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
 
