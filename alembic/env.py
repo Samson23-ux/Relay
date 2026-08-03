@@ -9,8 +9,10 @@ from alembic import context
 
 
 from shared.models.base import Base
+from apps.user_service.app.api import models    # noqa: F401
+from apps.order_service.app.api import models    # noqa: F401
+from apps.product_service.app.api import models    # noqa: F401
 from shared.core.shared_config import get_global_settings
-from apps.user_service.app.api import models as usermodels  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

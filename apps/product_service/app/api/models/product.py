@@ -27,7 +27,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String, unique=True)
     description: Mapped[str] = mapped_column(String)
     serial: Mapped[str] = mapped_column(String, unique=True)
-    price: Mapped[Decimal] = mapped_column(Numeric(precision=2))
+    price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2))
     quantity: Mapped[int] = mapped_column(
         Integer, CheckConstraint("quantity >= 0", name="products_quantity_ck")
     )
