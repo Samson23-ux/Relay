@@ -1,7 +1,9 @@
 from redis.retry import Retry
 from redis.asyncio import Redis
+from sqlalchemy.orm import sessionmaker
 from collections.abc import AsyncGenerator
 from redis.backoff import ExponentialBackoff
+from sqlalchemy import Engine, create_engine
 from redis.asyncio.connection import ConnectionPool
 from redis.exceptions import ConnectionError, TimeoutError
 
@@ -32,6 +34,17 @@ async_session = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+sync_engine: Engine = create_engine(
+    url=SETTINGS.SYNC_DB_URL,
+    pool_size=10,
+    pool_timeout=10.0,
+    pool_pre_ping=True,
+    max_overflow=5,
+    connect_args={"options": "-c timezone=utc"},
+)
+
+sync_session = sessionmaker(bind=sync_engine, autocommit=False, autoflush=False)
 
 redis_pool = ConnectionPool.from_url(
     SETTINGS.REDIS_URL,

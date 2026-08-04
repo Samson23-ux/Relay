@@ -5,16 +5,16 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import inspect, or_, select, text
+from sqlalchemy import inspect, or_, select
 from sqlalchemy.exc import IntegrityError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from apps.product_service.app.api.models.product import Product
 from shared.models.base import Base
-from shared.worker.db import db_engine, db_session
+from apps.product_service.app.api.models.product import Product
+from shared.database.shared_session import sync_engine, sync_session
 
 PRODUCTS = [
     {
@@ -233,12 +233,12 @@ PRODUCTS = [
 def seed_products() -> int:
     inserted_count = 0
 
-    inspector = inspect(db_engine)
+    inspector = inspect(sync_engine)
     if not inspector.has_table("products"):
         print("Creating products table...")
-        Base.metadata.create_all(bind=db_engine)
+        Base.metadata.create_all(bind=sync_engine)
 
-    with db_session() as session:
+    with sync_session() as session:
         for product_data in PRODUCTS:
             existing_product = session.scalar(
                 select(Product).where(

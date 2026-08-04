@@ -1,0 +1,66 @@
+upstreams:
+  user_service:
+    instances:
+      - url: http://user_service@:8001
+      - url: http://user_service#:8002
+
+  order_service:
+    instances:
+      - url: http://order_service@:8003
+      - url: http://order_service#:8004
+
+  product_service:
+    instances:
+      - url: http://product_service@:8005
+      - url: http://product_service#:8006
+
+routes:
+  - path: /api/v1/auth
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+    strip_prefix: /api/v1
+    auth_required: false
+    check_role: false
+    rate_limit:
+      requests: 10
+      window: 120s
+      key_by: ip
+    exceptions:
+      - paths: ["/api/v1/auth", "/api/v1/auth/me", "/api/v1/auth/logout"]
+        auth_required: true
+        rate_limit:
+          requests: 10
+          window: 120s
+          key_by: user_id
+
+  - path: /api/v1/products
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+    strip_prefix: /api/v1
+    auth_required: true
+    check_role: false
+    rate_limit:
+      requests: 50
+      window: 60s
+      key_by: user_id
+    exceptions:
+      - paths: ["/api/v1/products", "/api/v1/products/{id}"]
+        check_role: true
+
+  - path: /api/v1/orders
+    methods: ["GET", "POST", "DELETE"]
+    strip_prefix: /api/v1
+    auth_required: true
+    check_role: false
+    rate_limit:
+      requests: 50
+      window: 60s
+      key_by: user_id
+
+  - path: /api/v1/carts
+    methods: ["GET", "POST", "PATCH", "DELETE"]
+    strip_prefix: /api/v1
+    auth_required: true
+    check_role: false
+    rate_limit:
+      requests: 50
+      window: 60s
+      key_by: user_id

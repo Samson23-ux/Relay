@@ -1,28 +1,17 @@
 from typing import Any
 from redis import Redis
 from redis.retry import Retry
+from sqlalchemy.orm import Session
 from collections.abc import Generator
 from redis.connection import ConnectionPool
-from sqlalchemy import Engine, create_engine
 from redis.backoff import ExponentialBackoff
-from sqlalchemy.orm import Session, sessionmaker
 from redis.exceptions import TimeoutError, ConnectionError
 
+from shared.database.shared_session import sync_session
 from shared.core.shared_config import get_global_settings
 
 
 SETTINGS = get_global_settings()
-
-db_engine: Engine = create_engine(
-    url=SETTINGS.SYNC_DB_URL,
-    pool_size=10,
-    pool_timeout=10.0,
-    pool_pre_ping=True,
-    max_overflow=5,
-    connect_args={"options": "-c timezone=utc"},
-)
-
-db_session = sessionmaker(bind=db_engine, autocommit=False, autoflush=False)
 
 redis_pool = ConnectionPool.from_url(
     SETTINGS.REDIS_URL,
@@ -35,7 +24,7 @@ redis_pool = ConnectionPool.from_url(
 
 
 def get_db_session() -> Generator[Session, Any, None]:
-    with db_session() as session:
+    with sync_session() as session:
         yield session
 
 

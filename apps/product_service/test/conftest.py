@@ -1,5 +1,5 @@
 import pytest_asyncio
-from uuid import uuid7
+from uuid import UUID
 from sqlalchemy import text
 from unittest.mock import patch
 from redis.asyncio import Redis
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
 
 from shared.models.base import Base
 from apps.product_service.app.main import app
+from apps.order_service.app.api.models import order  # noqa: F401
 from apps.user_service.app.api.models.user import User
 from shared.database.shared_session import get_session
 from shared.core.shared_config import get_global_settings
@@ -30,6 +31,42 @@ async def async_engine():
     async_db_engine: AsyncEngine = create_async_engine(
         url=get_global_settings().ASYNC_TEST_DB_URL, poolclass=NullPool
     )
+
+    user_stmt = """
+        INSERT INTO users (
+        id,
+        type,
+        role,
+        email,
+        hashed_password,
+        is_active,
+        is_verified,
+        created_at
+        )
+        VALUES
+        (
+            '019fbd28-ea23-76ef-b14a-64a857bc11f3',
+            'email',
+            'user',
+            'user@example.com',
+            'test_user_password',
+            'true',
+            'true',
+            NOW()
+        );
+    """
+
+    order_stmt = """
+    INSERT INTO orders VALUES
+    (
+        '019fcbb2-f4ab-72eb-8551-6538813671ca',
+        '019fbd28-ea23-76ef-b14a-64a857bc11f3',
+        '501d2845-7d7c-4af5-bf4e-71d4613664ad',
+        'pending',
+        '80.00',
+        NOW()
+    )
+    """
 
     async with async_db_engine.begin() as conn:
         await conn.execute(text("""
@@ -55,6 +92,8 @@ async def async_engine():
                 $$;
         """))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text(user_stmt))
+        await conn.execute(text(order_stmt))
 
     yield async_db_engine
 
@@ -111,7 +150,7 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
         return async_session
 
     fake_user = User(
-        id=uuid7(),
+        id=UUID("019fbd28-ea23-76ef-b14a-64a857bc11f3"),
         type="email",
         role="admin",
         email="user@example.com",
@@ -132,7 +171,7 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     app.dependency_overrides.clear()
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture
 async def mock_log_task():
     with patch("shared.utils.save_log.apply_async") as log_mock:
         yield

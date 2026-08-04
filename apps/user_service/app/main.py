@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from apps.user_service.app.api.routers import router
 from shared.database.shared_session import redis_client
+from shared.middlewares.log import RequestLogMiddleware
 from apps.user_service.app.core.security import Security
 from shared.core.shared_config import get_global_settings
 from shared.core.exception_handlers import GlobalExceptionHandler
@@ -31,6 +32,7 @@ app = FastAPI(
 )
 
 app.include_router(router.router)
+app.add_middleware(RequestLogMiddleware)
 
 UserExceptionHandler(app).add_handlers()
 GlobalExceptionHandler(app).add_handlers()

@@ -1,5 +1,5 @@
 import psycopg2
-from uuid import uuid7
+from uuid import uuid4
 from celery.exceptions import Reject
 
 
@@ -21,7 +21,7 @@ def get_product(self, product_id: str, request_meta: dict):
 
     try:
         request_meta["parent_span_id"] = request_meta.get("span_id")
-        request_meta["span_id"] = str(uuid7())
+        request_meta["span_id"] = str(uuid4())
 
         product_db = product_service._get_sync_product(product_id, request_meta)
         product = ProductInDB.model_validate(product_db)
@@ -56,11 +56,8 @@ def process_reservation(self, payload: dict, request_meta: dict):
             order_id: str = payload.get("order_id")
             products: dict = payload.get("products")
 
-            if not request_meta.get("parent_span_id"):
-                # generate a new span_id and set parent_span_id to the current
-                # span_id if invoked first time
-                request_meta["parent_span_id"] = request_meta.get("span_id")
-                request_meta["span_id"] = str(uuid7())
+            request_meta["parent_span_id"] = request_meta.get("span_id")
+            request_meta["span_id"] = str(uuid4())
 
             if event == "reserve":
                 res = product_service.reserve_product(

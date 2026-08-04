@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from apps.order_service.app.api.routers import router
 from shared.database.shared_session import redis_client
+from shared.middlewares.log import RequestLogMiddleware
 from shared.core.shared_config import get_global_settings
 from shared.core.exception_handlers import GlobalExceptionHandler
 from apps.order_service.app.core.exception_handlers import OrderExceptionHandler
@@ -27,6 +28,7 @@ app = FastAPI(
 )
 
 app.include_router(router.router)
+app.add_middleware(RequestLogMiddleware)
 
 
 OrderExceptionHandler(app).add_handlers()

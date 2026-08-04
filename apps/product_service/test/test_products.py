@@ -5,7 +5,7 @@ from uuid import uuid7
 
 class TestCreateProduct:
     @pytest.mark.asyncio
-    async def test_create_product(self, create_product: httpx.Response):
+    async def test_create_product(self, mock_log_task, create_product: httpx.Response):
         assert create_product.status_code == 201
         assert create_product.json()["data"]["name"] == "test_product"
         assert create_product.json()["data"]["serial"] == "EumHUV41owYwmnzpjVKYng"
@@ -29,7 +29,10 @@ class TestCreateProduct:
 
     @pytest.mark.asyncio
     async def test_product_exist(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         product_create: dict = {
             "name": "Test_product",
@@ -50,7 +53,10 @@ class TestCreateProduct:
 class TestGetProduct:
     @pytest.mark.asyncio
     async def test_get_product(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         product_id = create_product.json()["data"]["id"]
 
@@ -64,7 +70,10 @@ class TestGetProduct:
 
     @pytest.mark.asyncio
     async def test_get_all_product(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         res: httpx.Response = await async_client.get("/products/all")
 
@@ -77,7 +86,10 @@ class TestGetProduct:
 
     @pytest.mark.asyncio
     async def test_get_products(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         res: httpx.Response = await async_client.get("/products")
 
@@ -89,7 +101,9 @@ class TestGetProduct:
         assert json_res["data"][0]["serial"] == "EumHUV41owYwmnzpjVKYng"
 
     @pytest.mark.asyncio
-    async def test_product_not_found(self, async_client: httpx.AsyncClient):
+    async def test_product_not_found(
+        self, mock_log_task, async_client: httpx.AsyncClient
+    ):
         product_id = uuid7()
 
         res: httpx.Response = await async_client.get(f"/products/{product_id}")
@@ -99,7 +113,10 @@ class TestGetProduct:
 class TestUpdateProduct:
     @pytest.mark.asyncio
     async def test_update_product(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         product_id = create_product.json()["data"]["id"]
         product_update: dict = {"quantity": 22}
@@ -114,7 +131,9 @@ class TestUpdateProduct:
         assert json_res["data"]["quantity"] == 22
 
     @pytest.mark.asyncio
-    async def test_product_not_found(self, async_client: httpx.AsyncClient):
+    async def test_product_not_found(
+        self, mock_log_task, async_client: httpx.AsyncClient
+    ):
         product_id = uuid7()
         product_update: dict = {"quantity": 22}
 
@@ -127,7 +146,10 @@ class TestUpdateProduct:
 class TestDeleteProduct:
     @pytest.mark.asyncio
     async def test_delete_product(
-        self, create_product: httpx.Response, async_client: httpx.AsyncClient
+        self,
+        mock_log_task,
+        create_product: httpx.Response,
+        async_client: httpx.AsyncClient,
     ):
         product_id = create_product.json()["data"]["id"]
 
