@@ -4,8 +4,6 @@ from fastapi import FastAPI
 from shared.schemas.response import ErrorResponse
 from shared.core.exceptions import create_exception_handler
 from apps.user_service.app.core.exceptions import (
-    AuthorizationError,
-    AuthenticationError,
     CredentialError,
     UserExistsError,
     InvalidOtpError,
@@ -18,24 +16,6 @@ class UserExceptionHandler:
         self._app = app
 
     def add_handlers(self):
-        self._app.add_exception_handler(
-            AuthenticationError,
-            create_exception_handler(
-                status_code=401,
-                initial_detail=ErrorResponse(message="User not authenticated."),
-            ),
-        )
-
-        self._app.add_exception_handler(
-            exc_class_or_status_code=AuthorizationError,
-            handler=create_exception_handler(
-                status_code=403,
-                initial_detail=ErrorResponse(
-                    message="User is not authorized to make the requested action"
-                ),
-            ),
-        )
-
         self._app.add_exception_handler(
             exc_class_or_status_code=UserExistsError,
             handler=create_exception_handler(

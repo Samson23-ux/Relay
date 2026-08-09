@@ -174,15 +174,14 @@ async def login(
     description="Create new access token for user with a valid refresh token",
 )
 async def create_new_token(
-    request: Request,
     response: Response,
     security: SecurityDep,
+    curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     request_meta: RequestMetaData,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
     access_token, refresh_token = await auth_service.create_auth_tokens(
-        request_meta, refresh_token, security
+        curr_user, request_meta, security
     )
 
     expire_time: int = USER_SETTINGS.REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
@@ -223,30 +222,20 @@ async def get_current_user(
     description="Log out account",
 )
 async def log_out(
-    request: Request,
-    security: SecurityDep,
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
     request_meta: RequestMetaData,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.logout(
-        request_meta, curr_user, refresh_token, security, user_service
-    )
+    await auth_service.logout(request_meta, curr_user, user_service)
     return SuccessResponse(message="Log out completed successfully")
 
 
 @router.delete("/auth", status_code=204, description="Delete account permanently")
 async def delete_account(
-    request: Request,
-    security: SecurityDep,
     curr_user: CurrUserDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
     request_meta: RequestMetaData,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.delete_account(
-        request_meta, curr_user, refresh_token, security, user_service
-    )
+    await auth_service.delete_account(request_meta, curr_user, user_service)

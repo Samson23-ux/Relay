@@ -1,18 +1,23 @@
 upstreams:
-  user_service:
+  - name: user_service
     instances:
-      - url: http://user_service@:8001
-      - url: http://user_service#:8002
+      - http://user_service@:8001
+      - http://user_service#:8002
 
-  order_service:
+  - name: order_service
     instances:
-      - url: http://order_service@:8003
-      - url: http://order_service#:8004
+      - http://order_service@:8003
+      - http://order_service#:8004
 
-  product_service:
+  - name: product_service
     instances:
-      - url: http://product_service@:8005
-      - url: http://product_service#:8006
+      - http://product_service@:8005
+      - http://product_service#:8006
+
+circuit_breaker:
+  failure_threshold: 5
+  recovery_timeout: 60s
+  half_open_requests: 2
 
 routes:
   - path: /api/v1/auth
@@ -20,47 +25,106 @@ routes:
     strip_prefix: /api/v1
     auth_required: false
     check_role: false
+    revoke_token: false
+    roles: [admin, user]
     rate_limit:
       requests: 10
       window: 120s
       key_by: ip
     exceptions:
-      - paths: ["/api/v1/auth", "/api/v1/auth/me", "/api/v1/auth/logout"]
+      - path: "/api/v1/auth/me"
+        method: GET
         auth_required: true
         rate_limit:
           requests: 10
           window: 120s
-          key_by: user_id
+          key_by: user_email
+
+      - path: "/api/v1/auth/refresh"
+        method: POST
+        revoke_token: true
+        rate_limit:
+          requests: 10
+          window: 120s
+          key_by: ip
+
+      - path: "/api/v1/auth/logout"
+        method: POST
+        auth_required: true
+        revoke_token: true
+        rate_limit:
+          requests: 10
+          window: 120s
+          key_by: user_email
+
+      - path: "/api/v1/auth"
+        method: DELETE
+        auth_required: true
+        revoke_token: true
+        rate_limit:
+          requests: 10
+          window: 120s
+          key_by: user_email
 
   - path: /api/v1/products
     methods: ["GET", "POST", "PATCH", "DELETE"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false
+    revoke_token: false
+    roles: [admin, user]
     rate_limit:
       requests: 50
       window: 60s
-      key_by: user_id
+      key_by: user_email
     exceptions:
-      - paths: ["/api/v1/products", "/api/v1/products/{id}"]
+      - path: "/api/v1/products"
+        method: POST
         check_role: true
+        roles: [admin]
+        rate_limit:
+          requests: 50
+          window: 60s
+          key_by: user_email
+
+      - path: "/api/v1/products/{id}"
+        method: PATCH
+        check_role: true
+        roles: [admin]
+        rate_limit:
+          requests: 50
+          window: 60s
+          key_by: user_email
+
+      - path: "/api/v1/products/{id}"
+        method: DELETE
+        check_role: true
+        roles: [admin]
+        rate_limit:
+          requests: 50
+          window: 60s
+          key_by: user_email
 
   - path: /api/v1/orders
     methods: ["GET", "POST", "DELETE"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false
+    revoke_token: false
+    roles: [admin, user]
     rate_limit:
       requests: 50
       window: 60s
-      key_by: user_id
+      key_by: user_email
 
   - path: /api/v1/carts
     methods: ["GET", "POST", "PATCH", "DELETE"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false
+    revoke_token: false
+    roles: [admin, user]
     rate_limit:
       requests: 50
       window: 60s
-      key_by: user_id
+      key_by: user_email

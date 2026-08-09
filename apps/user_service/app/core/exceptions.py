@@ -1,18 +1,6 @@
 from shared.core.exceptions import AppException
 
 
-class AuthenticationError(AppException):
-    """User not authenticated."""
-
-    pass
-
-
-class AuthorizationError(AppException):
-    """User not authorized"""
-
-    pass
-
-
 class UserExistsError(AppException):
     """User already exists"""
 

@@ -48,7 +48,7 @@ async def request_metadata(request: Request) -> dict:
         "trace_id": request.headers.get("x-trace-id"),
         "span_id": request.state.span_id,  # set by a middleware layer
         "parent_span_id": request.state.parent_span_id,  # set by a middleware layer
-        "client_ip": request.headers.get("x-forwarded-for").split(",")[-1],
+        "client_ip": request.client.host,
         "upstream": request.headers.get("x-upstream"),
         "upstream_instance": request.headers.get("x-upstream-instance"),
         "upstream_url": request.url,

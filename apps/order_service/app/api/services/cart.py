@@ -233,7 +233,9 @@ class CartService:
                     "request_meta": message_meta,
                 },
             )
-            total = (time.perf_counter() - start_time) * 1000
+            elapsed = (time.perf_counter() - start_time) * 1000
+            total_str = str(int(elapsed))[:2]
+            total = int(total_str)
 
             span_id = res.get("span_id")
             update_db_log(

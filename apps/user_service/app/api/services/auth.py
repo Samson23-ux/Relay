@@ -23,7 +23,6 @@ from apps.user_service.app.api.schemas.auth import (
     EmailVerify,
 )
 from apps.user_service.app.core.exceptions import (
-    AuthenticationError,
     CredentialError,
     UserExistsError,
     InvalidOtpError,
@@ -66,49 +65,6 @@ class AuthService:
             message = (
                 f"Error occurred while saving refresh token to redis. Error: {str(e)}"
             )
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise ServerError() from e
-
-    async def _revoke_refresh_token(
-        self,
-        circuit_key: str,
-        request_meta: dict,
-        refresh_token: str,
-        security: Security,
-    ) -> tuple:
-        refresh_token: dict = await security.decode_token(
-            refresh_token, self.SETTINGS.REFRESH_TOKEN_SECRET_KEY
-        )
-
-        if not refresh_token:
-            message = "Inavlid refresh token received during refresh"
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise AuthenticationError()
-
-        refresh_token_id: str = refresh_token["jti"]
-        key: str = f"tokens:{refresh_token_id}"
-
-        refresh_token_db: dict = await self._redis_repo.get_hset(key)
-
-        if not refresh_token_db:
-            message = "Inavlid refresh token received during refresh"
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise AuthenticationError()
-
-        user_email: str = refresh_token_db["email"]
-        user_type: str = refresh_token_db["user_type"]
-
-        try:
-            await self._redis_repo.delete_key(key)
-            return user_email, user_type
-        except Exception as e:
-            message = f"Error occurred while deleting refresh token from redis. Error: {str(e)}"
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
 
             log_error(message, request_meta, circuit)
@@ -388,12 +344,12 @@ class AuthService:
         return access_token, refresh_token
 
     async def create_auth_tokens(
-        self, request_meta: dict, refresh_token: str, security: Security
+        self, curr_user: User, request_meta: dict, security: Security
     ):
+        user_type: str = curr_user.type
+        user_email: str = get_user_email(curr_user)
+
         circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
-        user_email, user_type = await self._revoke_refresh_token(
-            circuit_key, request_meta, refresh_token, security
-        )
         access_token, refresh_token = await self._get_tokens(
             "user", user_email, user_type, circuit_key, request_meta, security
         )
@@ -428,18 +384,12 @@ class AuthService:
         self,
         request_meta: dict,
         curr_user: User,
-        refresh_token: str,
-        security: Security,
         user_service: UserService,
     ):
         circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
 
         request_meta["user_id"] = curr_user.id
         user_email: str = get_user_email(curr_user)
-
-        _ = await self._revoke_refresh_token(
-            circuit_key, request_meta, refresh_token, security
-        )
 
         curr_user.is_active = False
         await user_service.update_user(circuit_key, request_meta, curr_user)
@@ -453,8 +403,6 @@ class AuthService:
         self,
         request_meta: dict,
         curr_user: User,
-        refresh_token: str,
-        security: Security,
         user_service: UserService,
     ):
         user_email: str = get_user_email(curr_user)
@@ -462,10 +410,6 @@ class AuthService:
 
         request_meta["user_id"] = curr_user.id
         await user_service.delete_user(circuit_key, request_meta, curr_user)
-
-        _ = await self._revoke_refresh_token(
-            circuit_key, request_meta, refresh_token, security
-        )
 
         message = f"User {user_email} account deleted"
         circuit: dict = await self._redis_repo.get_hset(circuit_key)

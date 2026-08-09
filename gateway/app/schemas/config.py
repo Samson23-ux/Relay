@@ -1,19 +1,21 @@
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel
 
 
-class ServiceInstance(BaseModel):
-    url: str
+from shared.models.log import UpstreamType
 
 
-class Service(BaseModel):
-    user_service: list[ServiceInstance]
-    order_service: list[ServiceInstance]
-    product_service: list[ServiceInstance]
+class MethodEnum(str, Enum):
+    GET = "get"
+    POST = "post"
+    PATCH = "patch"
+    DELETE = "delete"
 
 
 class Upstream(BaseModel):
-    services: list[Service]
+    name: UpstreamType
+    instances: list[str]
 
 
 class RateLimit(BaseModel):
@@ -23,22 +25,34 @@ class RateLimit(BaseModel):
 
 
 class RouteException(BaseModel):
-    paths: list[str]
+    path: str
+    method: MethodEnum
     auth_required: Optional[bool] = None
     check_role: Optional[bool] = None
+    roles: list[str]
+    revoke_token: Optional[bool] = None
     rate_limit: Optional[RateLimit] = None
 
 
 class Route(BaseModel):
     path: str
-    methods: list[str]
+    methods: list[MethodEnum]
     strip_prefix: str
     auth_required: bool
     check_role: bool
+    revoke_token: bool
     rate_limit: RateLimit
-    exceptions: RouteException
+    roles: list[str]
+    exceptions: Optional[list[RouteException]] = None
+
+
+class CircuitBreaker(BaseModel):
+    failure_threshold: int
+    recovery_timeout: str
+    half_open_requests: int
 
 
 class Config(BaseModel):
     upstreams: list[Upstream]
     routes: list[Route]
+    circuit_breaker: CircuitBreaker

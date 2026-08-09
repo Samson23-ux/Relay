@@ -153,21 +153,15 @@ class TestAuthToken:
     ):
         res = await async_client.post(
             "/auth/refresh",
+            headers={
+                "X-USER-TYPE": "email",
+                "X-USER-EMAIL": "user@example.com",
+            },
         )
         json_res = res.json()
 
         assert res.status_code == 201
         assert "access_token" in json_res["data"]
-
-    @pytest.mark.asyncio
-    async def test_unauthorized_get_access_token(
-        self, async_client: httpx.AsyncClient, verify_user
-    ):
-        res = await async_client.post(
-            "/auth/refresh",
-        )
-
-        assert res.status_code == 401
 
 
 class TestGetCurrentUser:
