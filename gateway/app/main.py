@@ -1,13 +1,19 @@
+from pathlib import Path
 from fastapi import FastAPI
 from httpx import AsyncClient, Limits
 from contextlib import asynccontextmanager
 
 
 from gateway.app.schemas.config import Config
-from gateway.core.load_config import load_config
+from gateway.app.core.load_config import load_config
 from shared.database.shared_session import redis_client
 from shared.core.shared_config import get_global_settings
+from gateway.app.middlewares.proxy import ProxyMIddleware
 from gateway.app.middlewares.logging import LoggingMiddleware
+from gateway.app.middlewares.authentication import AuthMiddleware
+from gateway.app.middlewares.discovery import DiscoveryMiddleware
+from gateway.app.middlewares.rate_limiting import RateLimitMiddleware
+from gateway.app.middlewares.load_balancer import LoadBalancerMiddleware
 
 GLOBAL_SETTINGS = get_global_settings()
 
@@ -20,7 +26,9 @@ async def raise_for_status(response):
 async def lifespan(app: FastAPI):
     app.state.redis = redis_client
 
-    raw_config = load_config("config.yml")
+    path = Path(__file__).parent / "core" / "config.yml"
+
+    raw_config = load_config(path)
     app.state.config = Config.model_validate(raw_config)
 
     limit = Limits(
@@ -44,6 +52,11 @@ app = FastAPI(
 )
 
 
+app.add_middleware(ProxyMIddleware)
+app.add_middleware(LoadBalancerMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(AuthMiddleware)
+app.add_middleware(DiscoveryMiddleware)
 app.add_middleware(LoggingMiddleware)
 
 

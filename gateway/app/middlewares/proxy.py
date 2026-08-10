@@ -20,7 +20,9 @@ class CircuitState(str, Enum):
 
 
 class ProxyMIddleware(BaseHTTPMiddleware):
-    def __init__(self):
+    def __init__(self, app):
+        super().__init__(app)
+
         self._redis = None
 
     async def make_request(
@@ -76,8 +78,8 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
         request_meta: dict = {
             "trace_id": request.state.trace_id,
-            "span_id": request.state.user_email,
-            "parent_span_id": request.state.span_id,
+            "span_id": request.state.span_id,
+            "parent_span_id": request.state.parent_span_id,
             "client_ip": request.client.host,
             "upstream": request.state.upstream,
             "method": request.method,
@@ -95,22 +97,24 @@ class ProxyMIddleware(BaseHTTPMiddleware):
             ):
                 raise HTTPException(status_code=503, detail="Service Unavailable")
 
-            url: str = f"{request.state.upstream_instance}/{request.url.path}"
+            url: str = f"{request.state.upstream_instance}{request.url.path}"
 
             headers: dict = {
                 "x-trace-id": request.state.trace_id,
                 "x-span-id": request.state.span_id,
-                "x-user-email": request.state.user_email,
-                "x-user-type": request.state.user_type,
                 "x-upstream": request.state.upstream,
                 "x-upstream-instance": request.state.upstream_instance,
             }
+
+            if request.state.auth_required:
+                headers["x-user-type"] = request.state.user_type
+                headers["x-user-email"] = request.state.user_email
 
             start_time = time.perf_counter()
             res, retries = await self.make_request(url, headers, request, http_request)
 
             elapsed = (time.perf_counter() - start_time) * 1000
-            total_str = str(int(elapsed))[:2]
+            total_str = str(elapsed)[:2]
             total = int(total_str)
 
             message = "Response received"

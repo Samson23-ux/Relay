@@ -1,18 +1,18 @@
 upstreams:
   - name: user_service
     instances:
-      - http://user_service@:8001
-      - http://user_service#:8002
+      - http://user-service@:8001
+      - http://user-service#:8002
 
   - name: order_service
     instances:
-      - http://order_service@:8003
-      - http://order_service#:8004
+      - http://order-service@:8003
+      - http://order-service#:8004
 
   - name: product_service
     instances:
-      - http://product_service@:8005
-      - http://product_service#:8006
+      - http://product-service@:8005
+      - http://product-service#:8006
 
 circuit_breaker:
   failure_threshold: 5
@@ -21,7 +21,7 @@ circuit_breaker:
 
 routes:
   - path: /api/v1/auth
-    methods: ["GET", "POST", "PATCH", "DELETE"]
+    methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: false
     check_role: false
@@ -33,7 +33,7 @@ routes:
       key_by: ip
     exceptions:
       - path: "/api/v1/auth/me"
-        method: GET
+        method: get
         auth_required: true
         rate_limit:
           requests: 10
@@ -41,7 +41,7 @@ routes:
           key_by: user_email
 
       - path: "/api/v1/auth/refresh"
-        method: POST
+        method: post
         revoke_token: true
         rate_limit:
           requests: 10
@@ -49,7 +49,7 @@ routes:
           key_by: ip
 
       - path: "/api/v1/auth/logout"
-        method: POST
+        method: post
         auth_required: true
         revoke_token: true
         rate_limit:
@@ -58,7 +58,7 @@ routes:
           key_by: user_email
 
       - path: "/api/v1/auth"
-        method: DELETE
+        method: delete
         auth_required: true
         revoke_token: true
         rate_limit:
@@ -67,7 +67,7 @@ routes:
           key_by: user_email
 
   - path: /api/v1/products
-    methods: ["GET", "POST", "PATCH", "DELETE"]
+    methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false
@@ -79,7 +79,7 @@ routes:
       key_by: user_email
     exceptions:
       - path: "/api/v1/products"
-        method: POST
+        method: post
         check_role: true
         roles: [admin]
         rate_limit:
@@ -88,7 +88,7 @@ routes:
           key_by: user_email
 
       - path: "/api/v1/products/{id}"
-        method: PATCH
+        method: patch
         check_role: true
         roles: [admin]
         rate_limit:
@@ -97,7 +97,7 @@ routes:
           key_by: user_email
 
       - path: "/api/v1/products/{id}"
-        method: DELETE
+        method: delete
         check_role: true
         roles: [admin]
         rate_limit:
@@ -106,7 +106,7 @@ routes:
           key_by: user_email
 
   - path: /api/v1/orders
-    methods: ["GET", "POST", "DELETE"]
+    methods: ["get", "post", "delete"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false
@@ -118,7 +118,7 @@ routes:
       key_by: user_email
 
   - path: /api/v1/carts
-    methods: ["GET", "POST", "PATCH", "DELETE"]
+    methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: true
     check_role: false

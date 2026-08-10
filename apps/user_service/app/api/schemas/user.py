@@ -12,6 +12,7 @@ class UserBase(BaseModel):
     role: UserRole = UserRole.USER
     is_active: bool = False
     is_verified: bool = False
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -27,11 +28,6 @@ class EmailUser(UserBase):
 
 class UserInDB(GoogleUser, EmailUser):
     hashed_password: Optional[str] = None
-
-
-class CurrentUser(UserInDB):
-    id: UUID
-    created_at: datetime
 
 
 class GoogleUserResponse(GoogleUser):

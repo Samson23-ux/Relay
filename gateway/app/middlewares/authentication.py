@@ -8,7 +8,9 @@ from apps.user_service.app.core.config import get_user_settings
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self):
+    def __init__(self, app):
+        super().__init__(app)
+
         self._redis = None
         self._security = Security()
         self._settings = get_user_settings()
@@ -29,15 +31,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             if not payload:
                 raise HTTPException(status_code=401, detail="User not authenticated.")
-            
+
             if check_role:
-                user_role: str = payload.get("user_type")
+                user_role: str = payload.get("userrole")
 
                 if user_role not in roles:
                     raise HTTPException(status_code=403, detail="User not authorized.")
 
-            request.state.user_type = payload.get("user_type")
-            request.state.user_email = payload.get("user_email")
+            request.state.user_email = payload.get("sub")
+            request.state.user_type = payload.get("usertype")
 
         if revoke_token:
             refresh_token: str = request.cookies.get("refresh_token")
@@ -47,7 +49,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             if not payload:
                 raise HTTPException(status_code=401, detail="User not authenticated.")
-            
+
             refresh_token_id: str = refresh_token["jti"]
             key: str = f"tokens:{refresh_token_id}"
 
@@ -55,11 +57,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             if not refresh_token_db:
                 raise HTTPException(status_code=401, detail="User not authenticated.")
-            
+
             request.state.user_type = refresh_token_db["email"]
             request.state.user_email = refresh_token_db["user_type"]
 
             await self._redis.delete_key(key)
 
-        res = call_next(request)
+        res = await call_next(request)
         return res

@@ -43,19 +43,24 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         add_script = redis.register_script(self._add_script())
         limit_script = redis.register_script(self._limit_script())
 
-        key_by: str = request.state.limit.key_by
+        key_by: str = request.state.key_by
         normalized_path: str = self.normalize_request_path(request)
+
+        if key_by == "ip":
+            key_by = request.client.host
+        elif key_by == "user_email":
+            key_by = request.state.user_email
 
         now: int = int(time.time() * 1000)
 
-        window_ms: int = request.state.limit.window.removesuffix("s") * 1000
+        window_ms: int = int(request.state.window.removesuffix("s")) * 1000
         cutoff: int = now - window_ms
 
         set_key: str = f"rate_limit:{normalized_path}:{key_by}"
 
         request_count = limit_script(keys=[set_key], args=[cutoff, now])
 
-        if request_count > request.state.limit.requests:
+        if request_count > request.state.requests:
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
         add_script(keys=[set_key], args=[now, str(uuid4())])

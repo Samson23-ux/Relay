@@ -20,7 +20,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         res = await call_next(request)
 
         elapsed = (time.perf_counter() - start_time) * 1000
-        total_str = str(int(elapsed))[:2]
+        total_str = str(elapsed)[:2]
         total = int(total_str)
 
         message = "Gateway response received"

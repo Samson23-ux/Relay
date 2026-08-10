@@ -6,7 +6,9 @@ from shared.repo.redis import RedisRepository
 
 
 class LoadBalancerMiddleware(BaseHTTPMiddleware):
-    def __init__(self):
+    def __init__(self, app):
+        super().__init__(app)
+
         self._redis = None
 
     async def dispatch(self, request, call_next):
@@ -29,7 +31,7 @@ class LoadBalancerMiddleware(BaseHTTPMiddleware):
 
             curr_value = await self._redis.get_key(key)
 
-            if not curr_value:
+            if curr_value is None:
                 curr_value = "0"
                 await self._redis.set_key(key, curr_value)
 

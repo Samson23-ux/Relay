@@ -72,6 +72,7 @@ class Security:
             "sub": token_data.email,
             "exp": expire_time,
             "iat": datetime.now(timezone.utc),
+            "userrole": token_data.role,
             "usertype": token_data.user_type,
         }
 
@@ -100,6 +101,7 @@ class Security:
             "exp": expire_time,
             "iat": datetime.now(timezone.utc),
             "jti": str(uuid4()),
+            "userrole": token_data.role,
             "usertype": token_data.user_type,
         }
 

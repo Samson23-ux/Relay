@@ -29,7 +29,7 @@ class RouteException(BaseModel):
     method: MethodEnum
     auth_required: Optional[bool] = None
     check_role: Optional[bool] = None
-    roles: list[str]
+    roles: Optional[list[str]] = None
     revoke_token: Optional[bool] = None
     rate_limit: Optional[RateLimit] = None
 
@@ -43,7 +43,7 @@ class Route(BaseModel):
     revoke_token: bool
     rate_limit: RateLimit
     roles: list[str]
-    exceptions: Optional[list[RouteException]] = None
+    exceptions: Optional[list[RouteException]] = []
 
 
 class CircuitBreaker(BaseModel):
