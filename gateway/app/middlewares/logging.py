@@ -8,8 +8,8 @@ from shared.utils import log_info
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        trace_id = uuid4()
-        span_id = uuid4()
+        trace_id = str(uuid4())
+        span_id = str(uuid4())
         parent_span_id = None
 
         request.state.trace_id = trace_id
@@ -21,7 +21,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         elapsed = (time.perf_counter() - start_time) * 1000
         total_str = str(elapsed)[:2]
-        total = int(total_str)
+        total = int(total_str.removesuffix("."))
 
         message = "Gateway response received"
         request_meta: dict = {

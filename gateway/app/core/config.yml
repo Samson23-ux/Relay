@@ -1,18 +1,18 @@
 upstreams:
   - name: user_service
     instances:
-      - http://user-service@:8001
-      - http://user-service#:8002
+      - http://user-service:8001
+      - http://user-service:8002
 
   - name: order_service
     instances:
-      - http://order-service@:8003
-      - http://order-service#:8004
+      - http://order-service:8003
+      - http://order-service:8004
 
   - name: product_service
     instances:
-      - http://product-service@:8005
-      - http://product-service#:8006
+      - http://product-service:8005
+      - http://product-service:8006
 
 circuit_breaker:
   failure_threshold: 5

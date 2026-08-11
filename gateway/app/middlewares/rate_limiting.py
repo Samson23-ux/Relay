@@ -2,7 +2,7 @@ import time
 from uuid import uuid4
 from fastapi import Request
 from redis.asyncio import Redis
-from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
@@ -58,12 +58,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         set_key: str = f"rate_limit:{normalized_path}:{key_by}"
 
-        request_count = limit_script(keys=[set_key], args=[cutoff, now])
+        request_count = await limit_script(keys=[set_key], args=[cutoff, now])
 
         if request_count > request.state.requests:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            return JSONResponse(content="Rate limit exceeded", status_code=429)
 
-        add_script(keys=[set_key], args=[now, str(uuid4())])
+        await add_script(keys=[set_key], args=[now, str(uuid4())])
 
-        res = call_next(request)
+        res = await call_next(request)
         return res

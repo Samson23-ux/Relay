@@ -13,11 +13,17 @@ class RedisRepository:
     async def create_hset(self, key: str, mapping: dict):
         await self._async_redis.hset(key, mapping=mapping)
 
+    async def increment_counter(self, key: str) -> int:
+        return await self._async_redis.incr(key)
+
     async def get_hset(self, key: str) -> dict:
         return await self._async_redis.hgetall(key)
 
-    async def get_key(self, key: str) -> dict:
+    async def get_key(self, key: str) -> str:
         return await self._async_redis.get(key)
+
+    async def decrement_counter(self, key: str) -> int:
+        return await self._async_redis.decr(key)
 
     async def delete_key(self, key: str):
         await self._async_redis.delete(key)

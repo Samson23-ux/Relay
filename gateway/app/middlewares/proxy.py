@@ -1,8 +1,9 @@
 import time
+import httpx
 from enum import Enum
 from json import JSONDecodeError
-from fastapi import HTTPException, Request
-from httpx import HTTPStatusError, Response
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -27,34 +28,34 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
     async def make_request(
         self, url: str, headers: dict, request: Request, http_request: CustomRequest
-    ) -> tuple[Response, int]:
-        form: dict = request.form()
+    ) -> tuple[httpx.Response, int]:
+        retries = 0
+        form: dict = await request.form()
         cookies: dict = request.cookies
         params: dict = request.query_params
 
         data: dict | None = dict(form) if form else None
 
         try:
-            json: dict = request.json()
+            json: dict = await request.json()
         except JSONDecodeError:
             json = None
 
         if request.method == "GET":
-            res: Response = await http_request.get(url, params, headers, cookies)
+            res: httpx.Response = await http_request.get(url, params, headers, cookies)
             retries = http_request.get.retry.statistics["attempt_number"] - 1
         elif request.method == "POST":
-            res: Response = await http_request.post(
+            res: httpx.Response = await http_request.post(
                 url, params, data, json, headers, cookies
             )
-            retries = http_request.post.retry.statistics["attempt_number"] - 1
         elif request.method == "PATCH":
-            res: Response = await http_request.patch(
+            res: httpx.Response = await http_request.patch(
                 url, params, data, json, headers, cookies
             )
-            retries = http_request.patch.retry.statistics["attempt_number"] - 1
         elif request.method == "DELETE":
-            res: Response = await http_request.delete(url, params, headers, cookies)
-            retries = http_request.delete.retry.statistics["attempt_number"] - 1
+            res: httpx.Response = await http_request.delete(
+                url, params, headers, cookies
+            )
 
         return res, retries
 
@@ -71,10 +72,13 @@ class ProxyMIddleware(BaseHTTPMiddleware):
             circuit = {
                 "failures": 0,
                 "state": CircuitState.CLOSED,
-                "retry_at": None,
+                "retry_at": "None",
                 "half_open_requests": 0,
             }
             await self._redis.create_hset(breaker_key, circuit)
+
+        circuit["failures"] = int(circuit["failures"])
+        circuit["half_open_requests"] = int(circuit["half_open_requests"])
 
         request_meta: dict = {
             "trace_id": request.state.trace_id,
@@ -84,46 +88,87 @@ class ProxyMIddleware(BaseHTTPMiddleware):
             "upstream": request.state.upstream,
             "method": request.method,
             "path": request.url.path,
-            "latency_ms": int(total),
         }
 
         try:
             if circuit["state"] == CircuitState.OPEN:
-                raise HTTPException(status_code=503, detail="Service Unavailable")
+                return JSONResponse(
+                    content="Service Unavailable",
+                    status_code=503,
+                    headers={"retry_after": circuit["retry_at"]},
+                )
             elif (
                 circuit["state"] == CircuitState.HALFOPEN
                 and circuit["half_open_requests"]
                 >= config.circuit_breaker.half_open_requests
             ):
-                raise HTTPException(status_code=503, detail="Service Unavailable")
+                return JSONResponse(
+                    content="Service Unavailable",
+                    status_code=503,
+                    headers={"retry_after": circuit["retry_at"]},
+                )
 
-            url: str = f"{request.state.upstream_instance}{request.url.path}"
+            upstream_instance: str = request.state.upstream_instance
+
+            url: str = f"{upstream_instance}{request.url.path}"
 
             headers: dict = {
                 "x-trace-id": request.state.trace_id,
                 "x-span-id": request.state.span_id,
                 "x-upstream": request.state.upstream,
-                "x-upstream-instance": request.state.upstream_instance,
+                "x-upstream-instance": upstream_instance,
             }
 
             if request.state.auth_required:
                 headers["x-user-type"] = request.state.user_type
                 headers["x-user-email"] = request.state.user_email
 
+            instance_key: str = f"upstream:instance:{upstream_instance}"
+            total_requests = await self._redis.increment_counter(instance_key)
+
             start_time = time.perf_counter()
             res, retries = await self.make_request(url, headers, request, http_request)
-
             elapsed = (time.perf_counter() - start_time) * 1000
+
             total_str = str(elapsed)[:2]
-            total = int(total_str)
+            total = int(total_str.removesuffix("."))
 
             message = "Response received"
             request_meta["retries"] = retries
             request_meta["status_code"] = res.status_code
+            request_meta["latency_ms"] = int(total)
 
             log_info(message, request_meta)
-            return res
-        except HTTPStatusError as exc:
+
+            if total_requests > 0:
+                await self._redis.decrement_counter(instance_key)
+            await self._redis.create_hset(breaker_key, {"failures": 0})
+
+            HOP_BY_HOP_HEADERS = {
+                "connection",
+                "keep-alive",
+                "proxy-authenticate",
+                "proxy-authorization",
+                "te",
+                "trailers",
+                "transfer-encoding",
+                "upgrade",
+                "content-length",
+            }
+
+            response_headers = {
+                k: v
+                for k, v in res.headers.items()
+                if k.lower() not in HOP_BY_HOP_HEADERS
+            }
+
+            return Response(
+                content=res.content,
+                status_code=res.status_code,
+                headers=response_headers,
+                media_type=res.headers.get("content-type"),
+            )
+        except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
 
             if status_code >= 500:
@@ -134,25 +179,40 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                         config.circuit_breaker.recovery_timeout.removesuffix("s")
                     )
 
-                    circuit["half_open_requests"] = 0
-                    circuit["state"] = CircuitState.OPEN
-                    circuit["retry_at"] = datetime.now(timezone.utc) + timedelta(
+                    retry_at = datetime.now(timezone.utc) + timedelta(
                         seconds=recovery_timeout
+                    )
+
+                    await self._redis.create_hset(
+                        breaker_key,
+                        {
+                            "failures": circuit["failures"],
+                            "half_open_requests": 0,
+                            "state": CircuitState.OPEN,
+                            "retry_at": retry_at,
+                        },
                     )
 
                     message = "Service Unavailable"
                     request_meta["status_code"] = 503
 
                     log_info(message, request_meta)
-                    raise HTTPException(status_code=503, detail="Service Unavailable")
+                    return JSONResponse(
+                        content="Service Unavailable",
+                        status_code=503,
+                        headers={"retry_after": retry_at},
+                    )
 
+                await self._redis.create_hset(
+                    breaker_key, {"failures": circuit["failures"]}
+                )
                 message = "Error occured while processing request"
 
                 request_meta["status_code"] = status_code
                 log_info(message, request_meta)
 
-                raise HTTPException(
-                    status_code=status_code, detail="Internal Server Error"
+                return JSONResponse(
+                    content="Internal Server Error", status_code=status_code
                 )
 
             message = exc.response.reason_phrase
@@ -160,13 +220,12 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
             log_info(message, request_meta)
 
-            raise HTTPException(
-                status_code=status_code, detail=exc.response.reason_phrase
+            return JSONResponse(
+                content=exc.response.reason_phrase, status_code=status_code
             )
         except Exception as exc:
             message = str(exc)
-            request_meta["status_code"] = status_code
+            request_meta["status_code"] = 500
 
             log_info(message, request_meta)
-
-            raise HTTPException(status_code=500, detail="Internal Server Error")
+            return JSONResponse(content="Internal Server Error", status_code=500)

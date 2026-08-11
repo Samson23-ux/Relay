@@ -35,12 +35,12 @@ class LoadBalancerMiddleware(BaseHTTPMiddleware):
                 curr_value = "0"
                 await self._redis.set_key(key, curr_value)
 
-            last_seen_value = min(int(last_seen_value), int(curr_value))
-
-            if last_seen_value > curr_value:
+            if last_seen_value > int(curr_value):
                 instance = i
+
+            last_seen_value = min(last_seen_value, int(curr_value))
 
         request.state.upstream_instance = instance
 
-        res = call_next(request)
+        res = await call_next(request)
         return res

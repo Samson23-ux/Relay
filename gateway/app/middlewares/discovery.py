@@ -1,5 +1,5 @@
 import re
-from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
@@ -36,10 +36,10 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
                 break  # stop at first matching base route
 
         if matched_route is None:
-            raise HTTPException(status_code=404, detail="Endpoint not found")
+            return JSONResponse(content="Endpoint not found", status_code=404)
 
         if request_method not in matched_route.methods:
-            raise HTTPException(status_code=405, detail="Method not allowed")
+            return JSONResponse(content="Method not allowed", status_code=405)
 
         # upstream key is the service segment of the route path itself,
         # e.g. "/api/v1/auth" -> "auth" — same for base route and any of its exceptions
@@ -56,24 +56,25 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
         def pick(exc_val, route_val):
             return exc_val if exc_val is not None else route_val
 
-        source = matched_exception if matched_exception else None
-
         request.state.roles = pick(
-            source.roles if source else None, matched_route.roles
+            matched_exception.roles if matched_exception else None, matched_route.roles
         )
         request.state.check_role = pick(
-            source.check_role if source else None, matched_route.check_role
+            matched_exception.check_role if matched_exception else None,
+            matched_route.check_role,
         )
         request.state.revoke_token = pick(
-            source.revoke_token if source else None, matched_route.revoke_token
+            matched_exception.revoke_token if matched_exception else None,
+            matched_route.revoke_token,
         )
         request.state.auth_required = pick(
-            source.auth_required if source else None, matched_route.auth_required
+            matched_exception.auth_required if matched_exception else None,
+            matched_route.auth_required,
         )
 
         rate_limit = (
-            source.rate_limit
-            if (source and source.rate_limit)
+            matched_exception.rate_limit
+            if (matched_exception and matched_exception.rate_limit)
             else matched_route.rate_limit
         )
         request.state.window = rate_limit.window

@@ -7,7 +7,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         span_id = request.headers.get("x-span-id")
         parent_span_id = span_id
 
-        span_id = uuid4()
+        span_id = str(uuid4())
         request.state.span_id = span_id
         request.state.parent_span_id = parent_span_id
 

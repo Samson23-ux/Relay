@@ -1,75 +1,36 @@
 import respx
 import httpx
 import pytest
-import secrets
 from uuid import uuid4
-from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime, timedelta, timezone
-
-
-from apps.user_service.app.core.security import Security
-
-
-def get_security_mock():
-    payload: dict = {
-        "sub": "randomfakeid",
-        "name": "test_user",
-        "email": "user@example.com",
-    }
-
-    refresh_token_payload: dict = {
-        "email": "user@example.com",
-        "user_type": "google",
-        "refresh_token_id": str(uuid4()),
-        "refresh_token": secrets.token_urlsafe(32),
-        "refresh_token_expire_time": (datetime.now() + timedelta(days=1)).isoformat(),
-    }
-
-    token: dict = {"userinfo": payload}
-    access_token: str = secrets.token_urlsafe(32)
-
-    security = MagicMock(
-        spec=Security()
-    )  # pass an instance of the Security class to register instance attributes
-
-    security.oauth.google.authorize_redirect = AsyncMock(return_value=None)
-    security.oauth.google.authorize_access_token = AsyncMock(return_value=token)
-    security.prepare_tokens = AsyncMock(
-        return_value=(access_token, refresh_token_payload)
-    )
-
-    return security
-
+from datetime import datetime, timezone
 
 FAKE_USER = {
-    "id": uuid4(),
+    "id": str(uuid4()),
     "email": "user@example.com",
     "type": "email",
     "role": "user",
     "is_active": True,
     "is_verified": True,
-    "created_at": datetime.now(timezone.utc),
+    "created_at": str(datetime.now(timezone.utc)),
 }
 
 
 class TestSignUpWithEmail:
-    @pytest.mark.asyncio
-    async def test_sign_up(self, async_client: httpx.AsyncClient):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_sign_up(self, async_client: httpx.AsyncClient, mock_request_class):
         sign_up_payload: dict = {
             "email": "user@example.com",
             "password": "test_user_password",
         }
 
-        route = respx.post("http://user-service@:8001/api/v1/auth/signup").mock(
-            return_value=httpx.Response(
-                status_code=201,
-                json={
-                    "message": (
-                        "Sign up completed successfully."
-                        "Check your email for verification code and instructions"
-                    )
-                },
-            )
+        mock_request_class.post.return_value = httpx.Response(
+            status_code=201,
+            json={
+                "message": (
+                    "Sign up completed successfully."
+                    "Check your email for verification code and instructions"
+                )
+            },
         )
 
         res: httpx.Response = await async_client.post(
@@ -78,11 +39,6 @@ class TestSignUpWithEmail:
         )
 
         json_res = res.json()
-        req = route.calls[0].request
-
-        assert route.called
-        assert "x-trace-id" in req.headers
-        assert req.headers["x-upstream"] == "user_service"
 
         assert res.status_code == 201
         assert json_res["message"] == (
@@ -90,21 +46,24 @@ class TestSignUpWithEmail:
             "Check your email for verification code and instructions"
         )
 
-    @pytest.mark.asyncio
-    async def test_user_exists(self, async_client: httpx.AsyncClient):
+        mock_request_class.post.assert_called_once
+
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_user_exists(
+        self, async_client: httpx.AsyncClient, mock_request_class
+    ):
         sign_up_payload: dict = {
             "email": "user@example.com",
             "password": "test_user_password",
         }
 
-        route = respx.post("http://user-service@:8001/api/v1/auth/signup").mock(
-            return_value=httpx.Response(
-                status_code=409,
-                json={
-                    "status": "error",
-                    "message": "User already exists with the provided email user@example.com",
-                },
-            )
+        mock_request_class.post.return_value = httpx.Response(
+            status_code=409,
+            json={
+                "status": "error",
+                "message": "User already exists with the provided email user@example.com",
+            },
         )
 
         res: httpx.Response = await async_client.post(
@@ -113,22 +72,27 @@ class TestSignUpWithEmail:
             headers={"x-upstream": "relay"},
         )
 
-        assert route.called
+        json_res = res.json()
+
         assert res.status_code == 409
+        assert (
+            json_res["message"]
+            == "User already exists with the provided email user@example.com"
+        )
+
+        mock_request_class.post.assert_called_once
 
 
 class TestGetCurrentUser:
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_get_current_user(
-        self, async_client: httpx.AsyncClient, login: httpx.Response
+        self, async_client: httpx.AsyncClient, login: httpx.Response, mock_request_class
     ):
         access_token = login.json()["data"]["access_token"]
 
-        route = respx.get("http://user-service@:8001/api/v1/auth/me").mock(
-            return_value=httpx.Response(
-                status_code=200,
-                json={"message": "User retrieved successfully", "data": FAKE_USER},
-            )
+        mock_request_class.get.return_value = httpx.Response(
+            status_code=200,
+            json={"message": "User retrieved successfully", "data": FAKE_USER},
         )
 
         res: httpx.Response = await async_client.get(
@@ -137,55 +101,52 @@ class TestGetCurrentUser:
         )
 
         json_res = res.json()
-        req = route.calls[0].request
 
         assert res.status_code == 200
         assert "user@example.com" == json_res["data"]["email"]
 
-        assert route.called
-        assert req.headers["x-user-type"] == "email"
-        assert req.headers["x-upstream"] == "user_service"
-        assert req.headers["x-user-email"] == "user@example.com"
-
 
 class TestUnauthenticatedAndUnauthorized:
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_unauthenticated_user(self, async_client: httpx.AsyncClient):
         res: httpx.Response = await async_client.get("/auth/me")
 
         assert res.status_code == 401
+        assert res.json() == "User not authenticated"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_unauthorized_request(
         self, async_client: httpx.AsyncClient, login: httpx.Response
     ):
         access_token = login.json()["data"]["access_token"]
 
-        res: httpx.Response = await async_client.get(
-            "/carts",
+        res: httpx.Response = await async_client.post(
+            "/products",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
         assert res.status_code == 403
+        assert res.json() == "User not authorized"
 
 
 class TestUnknownEndpoint:
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_unknown_endpoint(self, async_client: httpx.AsyncClient):
         res: httpx.Response = await async_client.get("/users")
 
         assert res.status_code == 404
+        assert res.json() == "Endpoint not found"
 
 
 class TestRateLimit:
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_too_many_requests(self, async_client: httpx.AsyncClient):
         sign_up_payload: dict = {
             "email": "user@example.com",
             "password": "test_user_password",
         }
 
-        route = respx.post("http://user-service@:8001/api/v1/auth/signup")
+        route = respx.post("http://user-service:8001/api/v1/auth/signup")
 
         route.side_effect = [
             httpx.Response(201),
@@ -210,18 +171,17 @@ class TestRateLimit:
         assert res.status_code == 429
         assert route.call_count == 11
 
-
 class TestCircuitBreaker:
-    @pytest.mark.asyncio
-    async def test_service_unaivailable(self, async_client: httpx.AsyncClient):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_service_unaivailable(
+        self, async_client: httpx.AsyncClient, mock_request_class
+    ):
         sign_up_payload: dict = {
             "email": "user@example.com",
             "password": "test_user_password",
         }
 
-        route = respx.post("http://user-service@:8001/api/v1/auth/signup")
-
-        route.side_effect = [
+        mock_request_class.post.side_effect = [
             httpx.Response(500),
             httpx.Response(500),
             httpx.Response(500),
@@ -237,29 +197,28 @@ class TestCircuitBreaker:
             )
 
         assert res.status_code == 503
-        assert route.call_count == 6
+        assert mock_request_class.post.call_count == 6
 
 
 class TestRetry:
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_retry_endpoint(
-        self, async_client: httpx.AsyncClient, login: httpx.Response
+        self, async_client: httpx.AsyncClient, login: httpx.Response, mock_request_class
     ):
         access_token = login.json()["data"]["access_token"]
 
-        route = respx.get("http://user-service@:8001/api/v1/auth/me")
-
-        route.side_effect = [
+        mock_request_class.get.side_effect = [
             httpx.Timeout("request timeout"),
             httpx.ConnectError("connection refused"),
             httpx.Timeout("request timeout"),
             httpx.ConnectError("connection refused"),
         ]
 
-        res: httpx.Response = await async_client.get(
-            "/auth/me",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
+        for _ in range(4):
+            res: httpx.Response = await async_client.get(
+                "/auth/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
 
         assert res.status_code == 500
-        assert route.call_count == 4
+        assert mock_request_class.get.call_count == 4

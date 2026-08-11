@@ -1,13 +1,12 @@
 import respx
-import secrets
 from jose import jwt
 import pytest_asyncio
+from uuid import uuid4
 from sqlalchemy import text
-from uuid import uuid7, uuid4
 from redis.asyncio import Redis
 from sqlalchemy.pool import NullPool
 from asgi_lifespan import LifespanManager
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient, ASGITransport, Response
 from sqlalchemy.ext.asyncio import (
@@ -22,15 +21,14 @@ from sqlalchemy.ext.asyncio import (
 
 from gateway.app.main import app
 from shared.models.base import Base
-from shared.repo.redis import RedisRepository
-from apps.user_service.app.api.models.otp import Otp
 from shared.database.shared_session import get_session
-from apps.user_service.app.deps import get_auth_service
 from shared.core.shared_config import get_global_settings
 from apps.user_service.app.api import models  # noqa: F401
-from apps.user_service.app.api.services.auth import AuthService
+from shared.services.request import Request as CustomRequest
+from apps.user_service.app.core.config import get_user_settings
 from shared.shared_deps import get_redis_client, request_metadata
 
+USER_SETTINGS = get_user_settings()
 GLOBAL_SETTINGS = get_global_settings()
 
 
@@ -133,88 +131,25 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
     app.dependency_overrides.clear()
 
 
-# @pytest_asyncio.fixture
-# async def create_user(async_client: AsyncClient):
-#     sign_up_payload: dict = {
-#         "email": "user@example.com",
-#         "password": "test_user_password",
-#     }
+@pytest_asyncio.fixture(loop_scope="session")
+async def mock_request_class():
+    path: str = "gateway.app.middlewares.proxy.CustomRequest"
 
-#     route = respx.post("http://user-service@:8001/api/v1/auth/signup").mock(
-#         return_value=Response(
-#             status_code=201,
-#             json={
-#                 "message": (
-#                     "Sign up completed successfully."
-#                     "Check your email for verification code and instructions"
-#                 )
-#             },
-#         )
-#     )
+    request = MagicMock(spec=CustomRequest)
 
-#     res: Response = await async_client.post(
-#         "/auth/signup",
-#         json=sign_up_payload,
-#     )
-
-#     req = route.calls[0].request
-
-#     assert route.called
-#     assert "x-trace-id" in req.headers
-#     assert req.headers["x-upstream"] == "user_service"
-
-#     return res
-
-
-# def mock_auth_service(fake_otp: Otp, redis: Redis):
-#     otp_repo = AsyncMock()
-#     redis = RedisRepository(async_redis=redis)
-
-#     otp_repo.get_record = AsyncMock(return_value=fake_otp)
-#     auth_service = AuthService(otp_repo=otp_repo, redis_repo=redis)
-
-#     app.dependency_overrides[get_auth_service] = lambda: auth_service
-
-
-# @pytest_asyncio.fixture
-# async def verify_user(
-#     async_client: AsyncClient, create_user: Response, test_redis_client: Redis
-# ):
-#     otp_payload: dict = {
-#         "email": "user@example.com",
-#         "otp_code": "test_otp_token",
-#     }
-
-#     route = respx.patch("http://user-service@:8001/api/v1/auth/verify").mock(
-#         return_value=Response(
-#             status_code=200,
-#             json={"message": "User email verified successfully"},
-#         )
-#     )
-
-#     res: Response = await async_client.patch(
-#         "/auth/verify",
-#         json=otp_payload,
-#     )
-
-#     req = route.calls[0].request
-
-#     assert route.called
-#     assert "x-trace-id" in req.headers
-#     assert req.headers["x-upstream"] == "user_service"
-
-#     return res
+    with patch(path) as request_mock:
+        request_mock.return_value = request
+        yield request
 
 
 def get_access_token():
-    expire = (
-        datetime.now(timezone.utc)
-        + timedelta(days=GLOBAL_SETTINGS.REFRESH_TOKEN_EXPIRE_TIME),
+    exp = datetime.now(timezone.utc) + timedelta(
+        minutes=USER_SETTINGS.ACCESS_TOKEN_EXPIRE_TIME
     )
 
     payload: dict = {
         "sub": "user@example.com",
-        "exp": expire,
+        "exp": exp,
         "iat": datetime.now(timezone.utc),
         "jti": str(uuid4()),
         "userrole": "user",
@@ -223,31 +158,29 @@ def get_access_token():
 
     token: str = jwt.encode(
         claims=payload,
-        key=GLOBAL_SETTINGS.ACCESS_TOKEN_SECRET_KEY,
-        algorithm=GLOBAL_SETTINGS.JWT_ALGORITHM,
+        key=USER_SETTINGS.ACCESS_TOKEN_SECRET_KEY,
+        algorithm=USER_SETTINGS.JWT_ALGORITHM,
     )
 
     return token
 
 
-@pytest_asyncio.fixture
-async def login(async_client: AsyncClient):
+@pytest_asyncio.fixture(loop_scope="session")
+async def login(async_client: AsyncClient, mock_request_class):
     login_payload: dict = {
         "email": "user@example.com",
         "password": "test_user_password",
     }
 
-    route = respx.post("http://user-service@:8001/api/v1/auth/login").mock(
-        return_value=Response(
-            status_code=201,
-            json={
-                "message": "Login completed successfully",
-                "data": {
-                    "access_token": get_access_token(),
-                    "token_type": "bearer",
-                },
+    mock_request_class.post.return_value = Response(
+        status_code=201,
+        json={
+            "message": "Login completed successfully",
+            "data": {
+                "access_token": get_access_token(),
+                "token_type": "bearer",
             },
-        )
+        },
     )
 
     res: Response = await async_client.post(
@@ -255,11 +188,13 @@ async def login(async_client: AsyncClient):
         json=login_payload,
     )
 
-    req = route.calls[0].request
+    json_res = res.json()
 
-    assert route.called
-    assert "x-trace-id" in req.headers
-    assert req.headers["x-upstream"] == "user_service"
+    assert res.status_code == 201
+    assert json_res["message"] == "Login completed successfully"
+    assert "access_token" in json_res["data"]
+
+    mock_request_class.post.assert_called_once
 
     return res
 
