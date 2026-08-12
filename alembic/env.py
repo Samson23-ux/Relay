@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 
+from shared import models   # noqa: F401
 from shared.models.base import Base
 from apps.user_service.app.api import models    # noqa: F401
 from apps.order_service.app.api import models    # noqa: F401

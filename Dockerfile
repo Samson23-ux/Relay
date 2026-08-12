@@ -7,11 +7,12 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-
 WORKDIR Relay/
 
 COPY pyproject.toml uv.lock .
 
 RUN uv sync --no-dev --frozen
+
+ENV PATH="/Relay/.venv/bin:$PATH"
 
 COPY . .

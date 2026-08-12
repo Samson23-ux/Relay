@@ -282,7 +282,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: order_service_2
+    container_name: relay_gateway
     restart: always
     env_file: .env
     volumes:
@@ -301,3 +301,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+volumes:
+  relay_redis:
+  relay_api_db:
+  relay_broker:
+  pytest_cache:

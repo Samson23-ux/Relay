@@ -22,4 +22,5 @@ dependencies = [
     "tenacity>=9.1.4",
     "yml>=0.0.1",
     "respx>=0.23.1",
+    "gevent>=26.8.0",
 ]
