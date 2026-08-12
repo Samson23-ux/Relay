@@ -1,0 +1,303 @@
+services:
+  relay_api_db:
+    image: postgres:18-alpine
+    container_name: relay_api_db
+    volumes:
+      - relay_api_db:/var/lib/postgresql/
+    environment:
+      - POSTGRES_DB=relay
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p 5432 -U postgres -d relay"]
+      retries: 5
+      timeout: 10s
+      interval: 30s
+      start_period: 30s
+      start_interval: 5s
+
+  relay_redis:
+    image: redis:8-alpine
+    container_name: relay_redis
+    volumes:
+      - relay_redis:/var/lib/redis
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      retries: 5
+      timeout: 10s
+      interval: 30s
+      start_period: 30s
+      start_interval: 5s
+
+  relay_broker:
+    image: rabbitmq:4.0-management-alpine
+    container_name: relay_broker
+    restart: always
+    volumes:
+      - relay_broker:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFUALT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_VHOST=vhost
+    ports:
+      - 5672:5672
+      - 15672:15672
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running"]
+      retries: 5
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      start_interval: 5s
+  
+  relay_log_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: relay_log_worker
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["celery", "-A", "shared.worker.celery_app", "worker", "-Q", "relay.log", "-P", "gevent", "-l", "info"]
+    depends_on:
+      relay_api_db:
+        condition: service_healthy
+      relay_broker:
+        condition: service_healthy
+      relay_redis:
+        condition: service_healthy
+
+  relay_email_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: relay_email_worker
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["celery", "-A", "shared.worker.celery_app", "worker", "-Q", "relay.email", "-P", "gevent", "-l", "info"]
+    depends_on:
+      relay_api_db:
+        condition: service_healthy
+      relay_broker:
+        condition: service_healthy
+      relay_redis:
+        condition: service_healthy
+
+  relay_product_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: relay_product_worker
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["celery", "-A", "shared.worker.celery_app", "worker", "-Q", "relay.product", "-P", "gevent", "-l", "info"]
+    depends_on:
+      relay_api_db:
+        condition: service_healthy
+      relay_broker:
+        condition: service_healthy
+      relay_redis:
+        condition: service_healthy
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: migrate
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+    environment:
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+    entrypoint: ["alembic", "upgrade", "head"]
+    depends_on:
+      relay_api_db:
+        condition: service_healthy
+      relay_broker:
+        condition: service_healthy
+      relay_redis:
+        condition: service_healthy
+
+  user_service_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: user_service_1
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.user_service.app.main:app", "--port", "8001", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  user_service_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: user_service_2
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.user_service.app.main:app", "--port", "8002", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  product_service_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product_service_1
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.product_service.app.main:app", "--port", "8003", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  product_service_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product_service_2
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.product_service.app.main:app", "--port", "8004", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  order_service_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order_service_1
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.order_service.app.main:app", "--port", "8005", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  order_service_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order_service_2
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    entrypoint:
+      ["uvicorn", "apps.order_service.app.main:app", "--port", "8006", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  relay_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order_service_2
+    restart: always
+    env_file: .env
+    volumes:
+      - .:/Relay
+      - /Relay/.venv
+      - pytest_cache:/Relay/.pytest_cache
+    environment:
+      - REDIS_URL=redis://relay_redis:6379/0
+      - BROKER_URL=amqp://guest:guest@relay_broker:5672/vhost
+      - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
+    ports:
+      - 8000:8000
+    entrypoint:
+      ["uvicorn", "gateway.app.main:app", "--port", "8000", "--host", "0.0.0.0"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
