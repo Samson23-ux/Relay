@@ -239,7 +239,7 @@ class CartService:
 
             span_id = res.get("span_id")
             update_db_log(
-                span_id, request_meta.get("trace_id"), {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
             )
 
             product = ProductInDB.model_validate(res.get("data"))

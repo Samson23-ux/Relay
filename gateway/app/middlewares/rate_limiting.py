@@ -32,38 +32,39 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return path
 
     async def dispatch(self, request, call_next):
-        """
-        Lua Script is used to execute all commands as a single
-        operation. It blocks all other server activities,
-        preventing race conditions.
-        """
+        if request.state.limit_requests:
+            """
+            Lua Script is used to execute all commands as a single
+            operation. It blocks all other server activities,
+            preventing race conditions.
+            """
 
-        redis: Redis = request.app.state.redis
+            redis: Redis = request.app.state.redis
 
-        add_script = redis.register_script(self._add_script())
-        limit_script = redis.register_script(self._limit_script())
+            add_script = redis.register_script(self._add_script())
+            limit_script = redis.register_script(self._limit_script())
 
-        key_by: str = request.state.key_by
-        normalized_path: str = self.normalize_request_path(request)
+            key_by: str = request.state.key_by
+            normalized_path: str = self.normalize_request_path(request)
 
-        if key_by == "ip":
-            key_by = request.client.host
-        elif key_by == "user_email":
-            key_by = request.state.user_email
+            if key_by == "ip":
+                key_by = request.client.host
+            elif key_by == "user_email":
+                key_by = request.state.user_email
 
-        now: int = int(time.time() * 1000)
+            now: int = int(time.time() * 1000)
 
-        window_ms: int = int(request.state.window.removesuffix("s")) * 1000
-        cutoff: int = now - window_ms
+            window_ms: int = int(request.state.window.removesuffix("s")) * 1000
+            cutoff: int = now - window_ms
 
-        set_key: str = f"rate_limit:{normalized_path}:{key_by}"
+            set_key: str = f"rate_limit:{normalized_path}:{key_by}"
 
-        request_count = await limit_script(keys=[set_key], args=[cutoff, now])
+            request_count = await limit_script(keys=[set_key], args=[cutoff, now])
 
-        if request_count > request.state.requests:
-            return JSONResponse(content="Rate limit exceeded", status_code=429)
+            if request_count > request.state.requests:
+                return JSONResponse(content="Rate limit exceeded", status_code=429)
 
-        await add_script(keys=[set_key], args=[now, str(uuid4())])
+            await add_script(keys=[set_key], args=[now, str(uuid4())])
 
         res = await call_next(request)
         return res

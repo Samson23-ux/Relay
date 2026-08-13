@@ -3,18 +3,14 @@ from uuid import uuid4
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
-from shared.utils import log_info
+from shared.utils import log_info, update_db_log
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        trace_id = str(uuid4())
-        span_id = str(uuid4())
-        parent_span_id = None
-
-        request.state.trace_id = trace_id
-        request.state.span_id = span_id
-        request.state.parent_span_id = parent_span_id
+        request.state.trace_id = str(uuid4())
+        request.state.span_id = str(uuid4())
+        request.state.parent_span_id = None
 
         start_time = time.perf_counter()
         res = await call_next(request)
@@ -25,9 +21,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         message = "Gateway response received"
         request_meta: dict = {
-            "trace_id": trace_id,
-            "span_id": span_id,
-            "parent_span_id": parent_span_id,
+            "trace_id": request.state.trace_id,
+            "span_id": request.state.span_id,
+            "parent_span_id": request.state.parent_span_id,
             "client_ip": request.client.host,
             "upstream": "relay",
             "method": request.method,

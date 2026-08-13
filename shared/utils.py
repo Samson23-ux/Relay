@@ -32,7 +32,7 @@ def get_message_meta(request_meta: dict, upstream: str) -> dict:
         "trace_id": request_meta.get("trace_id"),
         "span_id": request_meta.get("span_id"),
         "parent_span_id": request_meta.get("parent_span_id"),
-        "user_id": str(request_meta.get("user_id"))
+        "user_id": str(request_meta.get("user_id")),
     }
 
     message_meta["upstream"] = upstream
@@ -76,8 +76,8 @@ def log_error(
     save_log.apply_async(priority=3, kwargs={"payload": request_meta})
 
 
-def update_db_log(span_id: str, trace_id: str, payload: dict):
+def update_db_log(trace_id: str, span_id: str, payload: dict):
     update_log.apply_async(
         priority=3,
-        kwargs={"span_id": span_id, "trace_id": trace_id, "payload": payload},
+        kwargs={"trace_id": trace_id, "span_id": span_id, "payload": payload},
     )

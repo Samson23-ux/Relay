@@ -28,7 +28,7 @@ class RouteException(BaseModel):
     path: str
     method: MethodEnum
     auth_required: Optional[bool] = None
-    check_role: Optional[bool] = None
+    limit_requests: Optional[bool] = None
     roles: Optional[list[str]] = None
     revoke_token: Optional[bool] = None
     rate_limit: Optional[RateLimit] = None
@@ -37,12 +37,12 @@ class RouteException(BaseModel):
 class Route(BaseModel):
     path: str
     methods: list[MethodEnum]
-    strip_prefix: str
+    strip_prefix: Optional[str] = None
     auth_required: bool
-    check_role: bool
+    limit_requests: bool
     revoke_token: bool
-    rate_limit: RateLimit
     roles: list[str]
+    rate_limit: Optional[RateLimit] = None
     exceptions: Optional[list[RouteException]] = []
 
 

@@ -20,11 +20,33 @@ circuit_breaker:
   half_open_requests: 2
 
 routes:
+  - path: /docs
+    methods: ["get"]
+    auth_required: false
+    limit_requests: false
+    revoke_token: false
+    roles: [admin, user]
+
+  - path: /relay/openapi.json
+    methods: ["get"]
+    auth_required: false
+    limit_requests: false
+    revoke_token: false
+    roles: [admin, user]
+
   - path: /api/v1/auth
     methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: false
-    check_role: false
+    limit_requests: true
+    revoke_token: false
+    roles: [admin, user]
+
+  - path: /api/v1/auth
+    methods: ["get", "post", "patch", "delete"]
+    strip_prefix: /api/v1
+    auth_required: false
+    limit_requests: true
     revoke_token: false
     roles: [admin, user]
     rate_limit:
@@ -70,7 +92,7 @@ routes:
     methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: true
-    check_role: false
+    limit_requests: true
     revoke_token: false
     roles: [admin, user]
     rate_limit:
@@ -80,7 +102,6 @@ routes:
     exceptions:
       - path: "/api/v1/products"
         method: post
-        check_role: true
         roles: [admin]
         rate_limit:
           requests: 50
@@ -89,7 +110,6 @@ routes:
 
       - path: "/api/v1/products/{id}"
         method: patch
-        check_role: true
         roles: [admin]
         rate_limit:
           requests: 50
@@ -98,7 +118,6 @@ routes:
 
       - path: "/api/v1/products/{id}"
         method: delete
-        check_role: true
         roles: [admin]
         rate_limit:
           requests: 50
@@ -109,7 +128,7 @@ routes:
     methods: ["get", "post", "delete"]
     strip_prefix: /api/v1
     auth_required: true
-    check_role: false
+    limit_requests: true
     revoke_token: false
     roles: [admin, user]
     rate_limit:
@@ -121,7 +140,7 @@ routes:
     methods: ["get", "post", "patch", "delete"]
     strip_prefix: /api/v1
     auth_required: true
-    check_role: false
+    limit_requests: true
     revoke_token: false
     roles: [admin, user]
     rate_limit:

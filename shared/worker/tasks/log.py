@@ -47,13 +47,13 @@ def save_log(self, payload: dict):
 
 
 @celery_app.task(bind=True, base=BaseTaskWithFailure)
-def update_log(self, span_id: str, trace_id: str, payload: dict):
+def update_log(self, trace_id: str, span_id: str, payload: dict):
     redis_repo = get_redis_repo()
     log_service = get_log_service()
 
     try:
-        span_id: str = UUID(span_id)
         trace_id: str = UUID(trace_id)
+        span_id: str = UUID(span_id)
 
         key: str = f"log:{trace_id}:{span_id}"
         log_exists: str | None = redis_repo.sync_get_key(key)

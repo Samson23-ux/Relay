@@ -12,8 +12,8 @@ class LogService:
     def __init__(self, log_repo: LogRepository):
         self._log_repo = log_repo
 
-    def get_log(self, trace_id: UUID, span_id: UUID | None) -> Log | None:
-        return self._log_repo.get_record(trace_id=trace_id, span_id=span_id)
+    def get_log(self, trace_id: UUID, span_id: UUID) -> Log | None:
+        return self._log_repo.get_sync_record(trace_id=trace_id, span_id=span_id)
 
     def create_log(self, log_create: LogCreate):
         try:

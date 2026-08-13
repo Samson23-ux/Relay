@@ -15,12 +15,11 @@ class LogRepository(BaseRepository[LogBase, Log]):
         if "trace_id" in filters:
             filter_conditions.append(self.model.trace_id == filters["trace_id"])
         if "span_id" in filters:
-            if filters["span_id"] is None:
-                filter_conditions.append(self.model.span_id.is_(filters["span_id"]))
-            else:
-                filter_conditions.append(self.model.span_id == filters["span_id"])
+            filter_conditions.append(self.model.span_id == filters["span_id"])
         if "upstream" in filters:
             filter_conditions.append(self.model.upstream == filters["upstream"])
+
+        return filter_conditions
 
     def _get_sort_fields(self, sort):
         return super()._get_sort_fields(sort)

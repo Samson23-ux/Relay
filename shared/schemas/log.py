@@ -25,6 +25,10 @@ class LogCreate(LogBase):
     path: Optional[str] = None
     circuit_open: Optional[bool] = None
     rate_limited: Optional[bool] = None
+    retries: Optional[int] = None
+    latency_ms: Optional[int] = None
+    status_code: Optional[int] = None
+    rate_limited: Optional[bool] = None
 
 
 class LogUpdate(LogBase):

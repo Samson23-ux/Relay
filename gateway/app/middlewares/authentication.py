@@ -19,7 +19,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self._redis = RedisRepository(async_redis=request.app.state.redis)
 
         roles: list[str] = request.state.roles
-        check_role: bool = request.state.check_role
         revoke_token: bool = request.state.revoke_token
         auth_required: bool = request.state.auth_required
 
@@ -38,11 +37,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not payload:
                 return JSONResponse(content="User not authenticated", status_code=401)
 
-            if check_role:
-                user_role: str = payload.get("userrole")
-
-                if user_role not in roles:
-                    return JSONResponse(content="User not authorized", status_code=403)
+            user_role: str = payload.get("userrole")
+            if user_role not in roles:
+                return JSONResponse(content="User not authorized", status_code=403)
 
             request.state.user_email = payload.get("sub")
             request.state.user_type = payload.get("usertype")

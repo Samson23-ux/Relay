@@ -1,11 +1,14 @@
 import re
 from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
 from gateway.app.schemas.config import Config
+from shared.core.shared_config import get_global_settings
 
 _PARAM_RE = re.compile(r"\{[^/]+\}")
+GLOBAL_SETTINGS = get_global_settings()
 
 
 def _path_pattern(path_template: str) -> re.Pattern:
@@ -22,6 +25,7 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
             "auth": "user_service",
             "products": "product_service",
             "orders": "order_service",
+            "carts": "order_service",
         }
 
     async def dispatch(self, request, call_next):
@@ -41,9 +45,10 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
         if request_method not in matched_route.methods:
             return JSONResponse(content="Method not allowed", status_code=405)
 
-        # upstream key is the service segment of the route path itself,
-        # e.g. "/api/v1/auth" -> "auth" — same for base route and any of its exceptions
-        upstream_key = matched_route.path.strip("/").split("/")[-1]
+        if matched_route.path == "/docs":
+            return get_swagger_ui_html(
+                openapi_url="/relay/openapi.json", title=GLOBAL_SETTINGS.API_TITLE
+            )
 
         matched_exception = None
         for exception in matched_route.exceptions:
@@ -59,10 +64,6 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
         request.state.roles = pick(
             matched_exception.roles if matched_exception else None, matched_route.roles
         )
-        request.state.check_role = pick(
-            matched_exception.check_role if matched_exception else None,
-            matched_route.check_role,
-        )
         request.state.revoke_token = pick(
             matched_exception.revoke_token if matched_exception else None,
             matched_route.revoke_token,
@@ -71,17 +72,30 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
             matched_exception.auth_required if matched_exception else None,
             matched_route.auth_required,
         )
+        request.state.limit_requests = pick(
+            matched_exception.limit_requests if matched_exception else None,
+            matched_route.limit_requests,
+        )
 
         rate_limit = (
             matched_exception.rate_limit
             if (matched_exception and matched_exception.rate_limit)
             else matched_route.rate_limit
         )
-        request.state.window = rate_limit.window
-        request.state.key_by = rate_limit.key_by
-        request.state.requests = rate_limit.requests
+        request.state.window = rate_limit.window if rate_limit else None
+        request.state.key_by = rate_limit.key_by if rate_limit else None
+        request.state.requests = rate_limit.requests if rate_limit else None
 
-        request.state.upstream = self._upstream_mapping.get(upstream_key)
+        if matched_route.path == "/relay/openapi.json":
+            request.state.request_route = matched_route.path.removeprefix("/relay")
+            request.state.upstream = ""
+        else:
+            # upstream key is the service segment of the route path itself,
+            # e.g. "/api/v1/auth" -> "auth" — same for base route and any of its exceptions
+            upstream_key = matched_route.path.strip("/").split("/")[-1]
+
+            request.state.request_route = request_path
+            request.state.upstream = self._upstream_mapping.get(upstream_key)
 
         res = await call_next(request)
         return res

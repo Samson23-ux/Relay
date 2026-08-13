@@ -229,7 +229,7 @@ class OrderService:
 
             span_id = res.get("span_id")
             update_db_log(
-                span_id, request_meta.get("trace_id"), {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
             )
 
             products_details: dict = res.get("data")
@@ -282,7 +282,7 @@ class OrderService:
 
             span_id = res.get("span_id")
             update_db_log(
-                span_id, request_meta.get("trace_id"), {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
             )
 
             # return order
@@ -316,7 +316,7 @@ class OrderService:
 
             span_id = res.get("span_id")
             update_db_log(
-                span_id, request_meta.get("trace_id"), {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
             )
 
             message = f"Error occured while creating order with cart_id {cart_id}. Error: {str(exc)}"

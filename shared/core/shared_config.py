@@ -15,7 +15,7 @@ class GlobalSettings(BaseSettings):
 
     # api details
     API_PREFIX: str = "/api/v1"
-    API_TITLE: str = "Cowrite"
+    API_TITLE: str = "Relay"
     API_VERSION: str = "v1.0"
     API_DESCRIPTION: str = "A Minimalistic API Gateway"
 
@@ -43,7 +43,6 @@ class GlobalSettings(BaseSettings):
     # resend email
     API_EMAIL: str
     RESEND_API_KEY: str
-
 
 @lru_cache(maxsize=1)
 def get_global_settings():
