@@ -3,7 +3,7 @@ from uuid import uuid4
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
-from shared.utils import log_info, update_db_log
+from shared.utils import log_info
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
@@ -14,10 +14,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         start_time = time.perf_counter()
         res = await call_next(request)
-
         elapsed = (time.perf_counter() - start_time) * 1000
-        total_str = str(elapsed)[:2]
-        total = int(total_str.removesuffix("."))
+
+        latency = f"{elapsed:.2f}ms"
 
         message = "Gateway response received"
         request_meta: dict = {
@@ -29,7 +28,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             "method": request.method,
             "path": request.url.path,
             "status_code": res.status_code,
-            "latency_ms": int(total)
+            "latency_ms": latency
         }
 
         if res.status_code == 429:

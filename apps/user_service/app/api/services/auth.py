@@ -1,4 +1,4 @@
-from uuid import UUID, uuid7
+from uuid import UUID, uuid4
 
 
 from shared.utils import log_error, log_info
@@ -78,7 +78,7 @@ class AuthService:
         email_service: EmailService,
         security: Security,
     ):
-        email_id: UUID = uuid7()
+        email_id: str = str(uuid4())
         user_email: str = email_login.email
         hashed_password: str = await security.hash_password(email_login.password)
 
@@ -270,7 +270,7 @@ class AuthService:
                 {"status": "used"}, user_id=existing_user.id, status="valid"
             )
 
-            email_id: UUID = uuid7()
+            email_id: str = str(uuid4())
             email_db: EmailInDB = EmailInDB(
                 id=email_id, processed_email=existing_user.email
             )

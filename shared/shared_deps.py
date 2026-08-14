@@ -51,7 +51,7 @@ async def request_metadata(request: Request) -> dict:
         "client_ip": request.client.host,
         "upstream": request.headers.get("x-upstream"),
         "upstream_instance": request.headers.get("x-upstream-instance"),
-        "upstream_url": request.url,
+        "upstream_url": str(request.url),
         "method": request.method,
         "path": request.url.path,
     }

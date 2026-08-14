@@ -3,7 +3,7 @@ services:
     image: postgres:18-alpine
     container_name: relay_api_db
     volumes:
-      - relay_api_db:/var/lib/postgresql/
+      - relay_api_db:/var/lib/postgresql
     environment:
       - POSTGRES_DB=relay
       - POSTGRES_USER=postgres
@@ -17,6 +17,27 @@ services:
       interval: 30s
       start_period: 30s
       start_interval: 5s
+
+  relay_pgadmin:
+    image: dpage/pgadmin4
+    container_name: relay_pgadmin
+    volumes:
+      - relay_pgadmin:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=postgres
+    ports:
+      - 5050:80
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O - -q http://localhost:80/misc/ping"]
+      retries: 5
+      timeout: 10s
+      interval: 30s
+      start_period: 30s
+      start_interval: 5s
+    depends_on:
+      relay_api_db:
+        condition: service_healthy
 
   relay_redis:
     image: redis:8-alpine
@@ -324,6 +345,7 @@ services:
         "--host", "0.0.0.0",
         "--reload",
         "--reload-dir", "/Relay/gateway/app",
+        "--reload-exclude", "/Relay/gateway/app/core/config.yml"
       ]
     depends_on:
       migrate:
@@ -334,3 +356,4 @@ volumes:
   relay_api_db:
   relay_broker:
   pytest_cache:
+  relay_pgadmin:

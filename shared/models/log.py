@@ -23,6 +23,7 @@ from shared.models.base import Base
 
 class UpstreamType(str, enum.Enum):
     RELAY = "relay"
+    PROXY = "proxy"
     USER_SERVICE = "user_service"
     ORDER_SERVICE = "order_service"
     PRODUCT_SERVICE = "product_service"
@@ -62,7 +63,7 @@ class Log(Base):
     method: Mapped[str | None] = mapped_column(String)
     path: Mapped[str | None] = mapped_column(String)
     status_code: Mapped[int | None] = mapped_column(Integer)
-    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    latency_ms: Mapped[str | None] = mapped_column(String)
     circuit_open: Mapped[bool | None] = mapped_column(Boolean)
     rate_limited: Mapped[bool | None] = mapped_column(Boolean, default=False)
     retries: Mapped[int | None] = mapped_column(Integer)

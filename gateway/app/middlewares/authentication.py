@@ -53,7 +53,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not payload:
                 return JSONResponse(content="User not authenticated", status_code=401)
 
-            refresh_token_id: str = refresh_token["jti"]
+            refresh_token_id: str = payload["jti"]
             key: str = f"tokens:{refresh_token_id}"
 
             refresh_token_db: dict = await self._redis.get_hset(key)
@@ -61,8 +61,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not refresh_token_db:
                 return JSONResponse(content="User not authenticated", status_code=401)
 
-            request.state.user_type = refresh_token_db["email"]
-            request.state.user_email = refresh_token_db["user_type"]
+            request.state.user_email = refresh_token_db["email"]
+            request.state.user_type = refresh_token_db["user_type"]
 
             await self._redis.delete_key(key)
 

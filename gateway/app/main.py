@@ -19,7 +19,8 @@ GLOBAL_SETTINGS = get_global_settings()
 
 
 async def raise_for_status(response):
-    response.raise_for_status()
+    if not response.is_redirect:
+        response.raise_for_status()
 
 
 @asynccontextmanager

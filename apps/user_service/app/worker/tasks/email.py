@@ -76,13 +76,16 @@ def send_verification_email(
     self,
     circuit_key: str,
     request_meta: dict,
-    email_id: UUID,
+    email_id: str,
     recipient_email: str,
-    user_id: UUID,
+    user_id: str,
 ):
     from apps.user_service.app.worker.services import get_email_service
 
     try:
+        user_id: UUID = UUID(user_id)
+        email_id: UUID = UUID(email_id)
+
         redis_repo = get_redis_repo()
         otp_service = get_otp_service()
         email_service = get_email_service()

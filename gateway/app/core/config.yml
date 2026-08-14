@@ -41,14 +41,6 @@ routes:
     limit_requests: true
     revoke_token: false
     roles: [admin, user]
-
-  - path: /api/v1/auth
-    methods: ["get", "post", "patch", "delete"]
-    strip_prefix: /api/v1
-    auth_required: false
-    limit_requests: true
-    revoke_token: false
-    roles: [admin, user]
     rate_limit:
       requests: 10
       window: 120s

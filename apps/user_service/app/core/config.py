@@ -23,6 +23,7 @@ class UserSettings(BaseSettings):
         "https://accounts.google.com/.well-known/openid-configuration"
     )
     GOOGLE_CLIENT_SECRET: str
+    GOOGLE_CALLBACK_URL: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     # session middleware
     SESSION_SECRET_KEY: str

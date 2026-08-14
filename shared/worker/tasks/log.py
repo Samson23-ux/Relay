@@ -1,5 +1,5 @@
 import psycopg2
-from uuid import UUID
+from uuid import UUID, uuid4
 from celery.exceptions import Reject
 
 
@@ -23,7 +23,7 @@ def save_log(self, payload: dict):
         span_id: str = UUID(payload.get("span_id"))
         trace_id: str = UUID(payload.get("trace_id"))
 
-        key: str = f"log:{trace_id}:{span_id}"
+        key: str = f"log:{trace_id}:{span_id}:{str(uuid4())}"
         log_exists: str | None = redis_repo.sync_get_key(key)
 
         if not log_exists:
@@ -55,7 +55,7 @@ def update_log(self, trace_id: str, span_id: str, payload: dict):
         trace_id: str = UUID(trace_id)
         span_id: str = UUID(span_id)
 
-        key: str = f"log:{trace_id}:{span_id}"
+        key: str = f"log:{trace_id}:{span_id}:{str(uuid4())}"
         log_exists: str | None = redis_repo.sync_get_key(key)
 
         if not log_exists:

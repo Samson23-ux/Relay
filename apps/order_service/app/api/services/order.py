@@ -224,12 +224,12 @@ class OrderService:
                 priority=5, kwargs={"payload": payload, "request_meta": message_meta}
             )
             elapsed = (time.perf_counter() - start_time) * 1000
-            total_str = str(int(elapsed))[:2]
-            total = int(total_str.removesuffix("."))
+
+            latency = f"{elapsed:.2f}ms"
 
             span_id = res.get("span_id")
             update_db_log(
-                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": latency}
             )
 
             products_details: dict = res.get("data")
@@ -277,12 +277,12 @@ class OrderService:
                 priority=5, kwargs={"payload": payload, "request_meta": message_meta}
             )
             elapsed = (time.perf_counter() - start_time) * 1000
-            total_str = str(int(elapsed))[:2]
-            total = int(total_str.removesuffix("."))
+
+            latency = f"{elapsed:.2f}ms"
 
             span_id = res.get("span_id")
             update_db_log(
-                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": latency}
             )
 
             # return order
@@ -311,12 +311,12 @@ class OrderService:
                 priority=5, kwargs={"payload": payload, "request_meta": message_meta}
             )
             elapsed = (time.perf_counter() - start_time) * 1000
-            total_str = str(int(elapsed))[:2]
-            total = int(total_str.removesuffix("."))
+
+            latency = f"{elapsed:.2f}ms"
 
             span_id = res.get("span_id")
             update_db_log(
-                request_meta.get("trace_id"), span_id, {"latency_ms": int(total)}
+                request_meta.get("trace_id"), span_id, {"latency_ms": latency}
             )
 
             message = f"Error occured while creating order with cart_id {cart_id}. Error: {str(exc)}"

@@ -2,6 +2,7 @@ import time
 import json
 import httpx
 from enum import Enum
+from uuid import uuid4
 from json import JSONDecodeError
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -40,10 +41,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
     def _log_request(
         self,
         level: str,
-        url: str,
         request_meta: dict,
-        upstream: str,
-        upstream_instance: str,
         message: str,
         retries: int,
         status_code: int,
@@ -51,11 +49,8 @@ class ProxyMIddleware(BaseHTTPMiddleware):
         circuit: dict,
     ):
         request_meta["retries"] = retries
-        request_meta["upstream_url"] = url
-        request_meta["upstream"] = upstream
         request_meta["latency_ms"] = latency
         request_meta["status_code"] = status_code
-        request_meta["upstream_instance"] = upstream_instance
 
         if level == "info":
             log_info(message, request_meta, circuit)
@@ -89,6 +84,10 @@ class ProxyMIddleware(BaseHTTPMiddleware):
         url: str = f"{upstream_instance}{request_path}"
         upstream: str | list[str] = request.state.upstream
 
+        span_id = str(uuid4())
+        request_meta["span_id"] = span_id
+
+        headers["x-span-id"] = span_id
         headers["x-upstream"] = upstream
         headers["x-upstream-instance"] = upstream_instance
 
@@ -123,17 +122,12 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                 )
                 elapsed = (time.perf_counter() - start_time) * 1000
 
+            latency = f"{elapsed:.2f}ms"
             message = "Response received successfully"
-
-            total_str = str(elapsed)[:2]
-            latency = int(total_str.removesuffix("."))
 
             self._log_request(
                 "info",
-                url,
                 request_meta,
-                upstream,
-                upstream_instance,
                 message,
                 retries,
                 res.status_code,
@@ -147,10 +141,11 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
             return res
         except httpx.HTTPStatusError as exc:
-            elapsed = (time.perf_counter() - start_time) * 1000
+            if total_requests > 0:
+                await self._redis.decrement_counter(instance_key)
 
-            total_str = str(elapsed)[:2]
-            latency = int(total_str.removesuffix("."))
+            elapsed = (time.perf_counter() - start_time) * 1000
+            latency = f"{elapsed:.2f}ms"
 
             status_code = exc.response.status_code
 
@@ -183,10 +178,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
                     self._log_request(
                         "error",
-                        url,
                         request_meta,
-                        upstream,
-                        upstream_instance,
                         message,
                         retries,
                         503,
@@ -206,10 +198,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
                 self._log_request(
                     "error",
-                    url,
                     request_meta,
-                    upstream,
-                    upstream_instance,
                     message,
                     retries,
                     status_code,
@@ -220,37 +209,34 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                     content="Internal Server Error", status_code=status_code
                 )
 
+            if status_code == 429:
+                request_meta["rate_limited"] = True
+
             message = exc.response.reason_phrase
             self._log_request(
                 "error",
-                url,
                 request_meta,
-                upstream,
-                upstream_instance,
                 message,
                 retries,
                 status_code,
                 latency,
                 circuit,
             )
-
             return JSONResponse(
                 content=exc.response.reason_phrase, status_code=status_code
             )
         except Exception as exc:
-            elapsed = (time.perf_counter() - start_time) * 1000
+            if total_requests > 0:
+                await self._redis.decrement_counter(instance_key)
 
-            total_str = str(elapsed)[:2]
-            latency = int(total_str.removesuffix("."))
+            elapsed = (time.perf_counter() - start_time) * 1000
+            latency = f"{elapsed:.2f}ms"
 
             message = str(exc)
 
             self._log_request(
                 "error",
-                url,
                 request_meta,
-                upstream,
-                upstream_instance,
                 message,
                 retries,
                 500,
@@ -277,11 +263,15 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
         try:
             for i in range(len(instances)):
+                span_id = str(uuid4())
+                request_meta["span_id"] = span_id
+
                 upstream_instance = instances[i]
                 upstream = request.state.upstream[i]
 
                 url: str = f"{upstream_instance}{request_path}"
 
+                headers["x-span-id"] = span_id
                 headers["x-upstream"] = upstream
                 headers["x-upstream-instance"] = upstream_instance
 
@@ -312,16 +302,11 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                     )
 
                 message = "Response received successfully"
-
-                total_str = str(elapsed)[:2]
-                latency = int(total_str.removesuffix("."))
+                latency = f"{elapsed:.2f}ms"
 
                 self._log_request(
                     "info",
-                    url,
                     request_meta,
-                    upstream,
-                    upstream_instance,
                     message,
                     retries,
                     res.status_code,
@@ -347,10 +332,11 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                 media_type=res.headers.get("content-type"),
             )
         except httpx.HTTPStatusError as exc:
-            elapsed = (time.perf_counter() - start_time) * 1000
+            if total_requests > 0:
+                await self._redis.decrement_counter(instance_key)
 
-            total_str = str(elapsed)[:2]
-            latency = int(total_str.removesuffix("."))
+            elapsed = (time.perf_counter() - start_time) * 1000
+            latency = f"{elapsed:.2f}ms"
 
             status_code = exc.response.status_code
 
@@ -383,10 +369,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
                     self._log_request(
                         "error",
-                        url,
                         request_meta,
-                        upstream,
-                        upstream_instance,
                         message,
                         retries,
                         503,
@@ -406,10 +389,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
                 self._log_request(
                     "error",
-                    url,
                     request_meta,
-                    upstream,
-                    upstream_instance,
                     message,
                     retries,
                     status_code,
@@ -420,13 +400,13 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                     content="Internal Server Error", status_code=status_code
                 )
 
+            if status_code == 429:
+                request_meta["rate_limited"] = True
+
             message = exc.response.reason_phrase
             self._log_request(
                 "error",
-                url,
                 request_meta,
-                upstream,
-                upstream_instance,
                 message,
                 retries,
                 status_code,
@@ -438,19 +418,17 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                 content=exc.response.reason_phrase, status_code=status_code
             )
         except Exception as exc:
-            elapsed = (time.perf_counter() - start_time) * 1000
+            if total_requests > 0:
+                await self._redis.decrement_counter(instance_key)
 
-            total_str = str(elapsed)[:2]
-            latency = int(total_str.removesuffix("."))
+            elapsed = (time.perf_counter() - start_time) * 1000
+            latency = f"{elapsed:.2f}ms"
 
             message = str(exc)
 
             self._log_request(
                 "error",
-                url,
                 request_meta,
-                upstream,
-                upstream_instance,
                 message,
                 retries,
                 500,
@@ -481,9 +459,9 @@ class ProxyMIddleware(BaseHTTPMiddleware):
 
         request_meta: dict = {
             "trace_id": request.state.trace_id,
-            "span_id": request.state.span_id,
-            "parent_span_id": request.state.parent_span_id,
+            "parent_span_id": request.state.span_id,
             "client_ip": request.client.host,
+            "upstream": "proxy",
             "method": request.method,
             "path": request_path,
         }
@@ -505,10 +483,7 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                 headers={"retry_after": circuit["retry_at"]},
             )
 
-        headers: dict = {
-            "x-trace-id": request.state.trace_id,
-            "x-span-id": request.state.span_id,
-        }
+        headers: dict = {"x-trace-id": request.state.trace_id}
 
         if request.state.auth_required:
             headers["x-user-type"] = request.state.user_type
@@ -547,5 +522,5 @@ class ProxyMIddleware(BaseHTTPMiddleware):
             content=res.content if isinstance(res, httpx.Response) else res.body,
             status_code=res.status_code,
             headers=response_headers,
-            media_type=res.headers.get("content-type"),
+            media_type=response_headers.get("content-type"),
         )

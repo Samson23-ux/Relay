@@ -62,7 +62,7 @@ async def sign_up_with_email(
     description="Sign in with Google account",
 )
 async def sign_in_with_google(request: Request, security: SecurityDep):
-    redirect_uri = request.url_for("google_callback")
+    redirect_uri = USER_SETTINGS.GOOGLE_CALLBACK_URL
     await security.register_oauth()
     return await security.oauth.google.authorize_redirect(request, redirect_uri)
 
