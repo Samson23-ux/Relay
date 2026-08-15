@@ -14,6 +14,8 @@ class UserRepository(BaseRepository[UserBase, User]):
     def _get_filters(self, **filters) -> list[Any]:
         filter_conditions = []
 
+        if "role" in filters:
+            filter_conditions.append(self.model.role.in_(filters["role"]))
         if "email" in filters:
             filter_conditions.append(self.model.email == filters["email"])
         if "google_email" in filters:

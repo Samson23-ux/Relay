@@ -171,8 +171,9 @@ class AuthService:
             )
             await user_service.create_user(circuit_key, request_meta, user, user_email)
 
+        role: str = existing_user.role if existing_user else user.role
         access_token, refresh_token = await self._get_tokens(
-            "user", user_email, "google", circuit_key, request_meta, security
+            role, user_email, "google", circuit_key, request_meta, security
         )
 
         message = f"Google sign in completed for user {user_email}"
@@ -334,7 +335,7 @@ class AuthService:
         await user_service.update_user(circuit_key, request_meta, existing_user)
 
         access_token, refresh_token = await self._get_tokens(
-            "user", user_email, "email", circuit_key, request_meta, security
+            existing_user.role, user_email, "email", circuit_key, request_meta, security
         )
 
         message = f"Login completed for user {user_email}"
@@ -351,7 +352,7 @@ class AuthService:
 
         circuit_key: str = f"circuit:{request_meta.get("upstream_instance")}"
         access_token, refresh_token = await self._get_tokens(
-            "user", user_email, user_type, circuit_key, request_meta, security
+            curr_user.role, user_email, user_type, circuit_key, request_meta, security
         )
 
         message = f"Access and refresh tokens created for user {user_email}"

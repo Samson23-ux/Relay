@@ -55,6 +55,7 @@ class Log(Base):
     )
     upstream_instance: Mapped[str | None] = mapped_column(String)
     upstream_url: Mapped[str | None] = mapped_column(String)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(UUID)
     message: Mapped[str] = mapped_column(String)
     log_level: Mapped[enum.Enum] = mapped_column(
         Enum(LogLevel, values_callable=lambda e: [m.value for m in e]),

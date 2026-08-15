@@ -483,7 +483,10 @@ class ProxyMIddleware(BaseHTTPMiddleware):
                 headers={"retry_after": circuit["retry_at"]},
             )
 
-        headers: dict = {"x-trace-id": request.state.trace_id}
+        headers: dict = {
+            "x-trace-id": request.state.trace_id,
+            "x-route-roles": json.dumps(request.state.roles),
+        }
 
         if request.state.auth_required:
             headers["x-user-type"] = request.state.user_type

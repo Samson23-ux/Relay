@@ -178,8 +178,9 @@ services:
       - .:/Relay
       - /Relay/.venv
     environment:
+      - SYNC_DB_URL=postgresql+psycopg2://postgres:postgres@relay_api_db:5432/relay
       - ASYNC_DB_URL=postgresql+asyncpg://postgres:postgres@relay_api_db:5432/relay
-    entrypoint: ["alembic", "upgrade", "head"]
+    entrypoint: ["sh", "-c", "alembic upgrade head && python -m scripts.seed_products"]
     depends_on:
       relay_api_db:
         condition: service_healthy
@@ -345,7 +346,7 @@ services:
         "--host", "0.0.0.0",
         "--reload",
         "--reload-dir", "/Relay/gateway/app",
-        "--reload-exclude", "/Relay/gateway/app/core/config.yml"
+        "--reload-exclude", "*/gateway/app/core/config.yml"
       ]
     depends_on:
       migrate:

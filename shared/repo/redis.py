@@ -7,8 +7,8 @@ class RedisRepository:
         self._sync_redis = sync_redis
         self._async_redis = async_redis
 
-    async def set_key(self, key: str, value: str):
-        await self._async_redis.set(key, value)
+    async def set_key(self, key: str, value: str, expire: int = None):
+        await self._async_redis.set(key, value, ex=expire)
 
     async def create_hset(self, key: str, mapping: dict):
         await self._async_redis.hset(key, mapping=mapping)

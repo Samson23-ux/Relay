@@ -10,7 +10,7 @@ class ProductBase(BaseModel):
 
     name: str
     description: str = Field(..., min_length=15)
-    serial: str = Field(..., min_length=8)
+    serial: str = Field(..., min_length=5)
     price: Decimal = Field(..., decimal_places=2)
     quantity: int = Field(..., ge=1)
 
@@ -28,7 +28,7 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = Field(None, min_length=15)
-    serial: Optional[str] = Field(None, min_length=8)
+    serial: Optional[str] = Field(None, min_length=5)
     price: Optional[Decimal] = Field(None, decimal_places=2)
     quantity: Optional[int] = Field(None, ge=1)
 

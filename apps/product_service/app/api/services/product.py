@@ -74,8 +74,9 @@ class ProductService:
                         p["updated_at"].isoformat() if p["updated_at"] else None
                     )
 
+                expire = 60 * 60 * 24
                 products: str = json.dumps(cache_data)
-                await self._redis_repo.set_key("page:products", products)
+                await self._redis_repo.set_key("page:products", products, expire)
 
                 product_res: list[dict] = [
                     ProductResponse.model_validate(p) for p in products_db
@@ -183,6 +184,10 @@ class ProductService:
                 message = f"Product not found with id: {id}"
                 log_error(message, request_meta)
                 raise ProductNotFoundError(id=id)
+
+            message = f"Product with id {id} retrieved successfully"
+            log_info(message, request_meta)
+
             return product_db
         except Exception as exc:
             if isinstance(exc, ProductNotFoundError):

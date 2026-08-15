@@ -1,5 +1,5 @@
 import psycopg2
-from uuid import uuid4
+from uuid import uuid4, UUID
 from celery.exceptions import Reject
 
 
@@ -20,6 +20,7 @@ def get_product(self, product_id: str, request_meta: dict):
     product_service = get_product_service()
 
     try:
+        request_meta["task_id"] = UUID(self.request.id)
         request_meta["parent_span_id"] = request_meta.get("span_id")
         request_meta["span_id"] = str(uuid4())
 
@@ -56,6 +57,7 @@ def process_reservation(self, payload: dict, request_meta: dict):
             order_id: str = payload.get("order_id")
             products: dict = payload.get("products")
 
+            request_meta["task_id"] = UUID(self.request.id)
             request_meta["parent_span_id"] = request_meta.get("span_id")
             request_meta["span_id"] = str(uuid4())
 

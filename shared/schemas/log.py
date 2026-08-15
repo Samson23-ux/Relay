@@ -22,6 +22,7 @@ class LogCreate(LogBase):
     upstream: UpstreamType
     upstream_instance: Optional[str] = None
     upstream_url: Optional[str] = None
+    task_id: Optional[UUID] = None
     message: str
     log_level: LogLevel = LogLevel.INFO
     method: Optional[str] = None

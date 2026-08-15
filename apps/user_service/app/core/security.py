@@ -111,7 +111,7 @@ class Security:
             algorithm=self.SETTINGS.JWT_ALGORITHM,
         )
 
-        return token, payload["jti"], payload["usertype"]
+        return token, payload["jti"]
 
     async def decode_token(self, token: str, key: str):
         try:
@@ -127,7 +127,7 @@ class Security:
 
     async def prepare_tokens(self, token_data: TokenData):
         access_token: str = await self.create_access_token(token_data)
-        refresh_token, refresh_token_id, user_type = await self.create_refresh_token(
+        refresh_token, refresh_token_id = await self.create_refresh_token(
             token_data
         )
 
@@ -137,7 +137,8 @@ class Security:
 
         refresh_token_payload: dict = {
             "email": token_data.email,
-            "user_type": user_type,
+            "user_role": token_data.role,
+            "user_type": token_data.user_type,
             "refresh_token_id": refresh_token_id,
             "refresh_token": refresh_token,
             "refresh_token_expire_time": refresh_token_expire_time,

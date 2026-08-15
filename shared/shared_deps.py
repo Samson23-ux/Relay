@@ -1,3 +1,4 @@
+import json
 from typing import Annotated
 from redis.asyncio import Redis
 from fastapi import Depends, Request
@@ -77,14 +78,23 @@ async def get_current_user(
 
     user_type: str = request.headers.get("x-user-type")
     user_email: str = request.headers.get("x-user-email")
+    route_roles: list[str] = json.loads(request.headers.get("x-route-roles"))
 
     if user_type == "email":
         curr_user: User = await user_service.get_user_by_email(
-            circuit_key, request_meta, email=user_email, is_verified=True
+            circuit_key,
+            request_meta,
+            email=user_email,
+            is_verified=True,
+            role=route_roles,
         )
     else:
         curr_user: User = await user_service.get_user_by_email(
-            circuit_key, request_meta, email=user_email, is_verified=True
+            circuit_key,
+            request_meta,
+            email=user_email,
+            is_verified=True,
+            role=route_roles,
         )
 
     return curr_user
