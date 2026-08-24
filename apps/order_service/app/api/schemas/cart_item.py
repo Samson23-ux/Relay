@@ -1,6 +1,6 @@
 from uuid import UUID
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -14,12 +14,13 @@ class CartItemBase(BaseModel):
 
 
 class CartItemInDB(CartItemBase):
-    cart_id: UUID
     product_id: UUID
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CartItemResponse(CartItemBase):
     model_config = ConfigDict(from_attributes=True)
 
+    cart_id: UUID
     product: ProductItem
     created_at: datetime

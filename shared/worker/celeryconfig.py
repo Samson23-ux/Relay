@@ -42,4 +42,5 @@ task_routes = {
     "apps.product_service.app.worker.tasks.product.get_product": {"queue": "relay.product"},
     "apps.user_service.app.worker.tasks.email.send_verification_email": {"queue": "relay.email"},
     "apps.product_service.app.worker.tasks.product.process_reservation": {"queue": "relay.product"},
+    "apps.product_service.app.worker.tasks.product.restore_product_quantity": {"queue": "relay.product"},
 }

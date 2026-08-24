@@ -1,77 +1,77 @@
 from uuid import UUID
 
 
-from shared.utils import log_error
 from shared.repo.redis import RedisRepository
-from shared.core.exceptions import ServerError
-from apps.order_service.app.api.models.cart_item import CartItem
-from apps.order_service.app.api.schemas.cart_item import CartItemInDB
-from apps.order_service.app.api.repo.cart_item import CartItemRepository
+from apps.order_service.app.utils import fetch_product
+from apps.order_service.app.api.repo.cart import CartRepository
 
 
 class CartItemService:
-    def __init__(self, item_repo: CartItemRepository, redis_repo: RedisRepository):
-        self._item_repo = item_repo
+    def __init__(
+        self,
+        cart_repo: CartRepository,
+        redis_repo: RedisRepository,
+    ):
+        self._cart_repo = cart_repo
         self._redis_repo = redis_repo
 
-    async def _get_carts_with_items(self, user_id: UUID, sort: str | None, order: str):
-        return await self._item_repo.get_carts_with_items(user_id, sort, order)
+    async def _get_cart_with_items(
+        self,
+        user_id: UUID,
+        cart_id: UUID,
+        request_meta: dict,
+        product_id: UUID | None = None,
+    ) -> list[tuple]:
+        cart: dict | None = await self._cart_repo.get_cart(cart_id)
 
-    async def _get_cart_with_items(self, user_id: UUID, **filters):
-        return await self._item_repo.get_cart_with_items(user_id, **filters)
+        if not cart or cart["user_id"] != str(user_id):
+            return []
 
-    async def _get_cart_items(self, **filters):
-        return await self._item_repo.get_cart_items(**filters)
+        items: list[dict] = cart["cart_items"]
 
-    async def _get_cart_item(self, cart_id: UUID, product_id: UUID) -> CartItem | None:
-        return await self._item_repo.get_cart_item(
-            cart_id=cart_id, product_id=product_id
+        if product_id:
+            items = [item for item in items if item["product_id"] == str(product_id)]
+
+        return await self._build_item_rows(
+            [(cart["id"], item) for item in items], request_meta
         )
 
-    async def _create_cart_item(
-        self, cart_item: CartItemInDB, circuit_key: str, request_meta: dict
-    ):
-        try:
-            await self._item_repo.insert_cart_item(entity=cart_item)
-        except Exception as exc:
-            message = (
-                "Error occured while creating cart item."
-                f"Cart_id: {cart_item.cart_id} - Product_id: {cart_item.product_id}."
-                f"Error: {str(exc)}"
+    async def _get_carts_with_items(
+        self, user_id: UUID, sort: str | None, order: str, request_meta: dict
+    ) -> list[tuple]:
+        carts: list[dict] = await self._cart_repo.get_carts(user_id, sort, order)
+        items: list[tuple[str, dict]] = [
+            (cart["id"], item) for cart in carts for item in cart["cart_items"]
+        ]
+
+        return await self._build_item_rows(items, request_meta)
+
+    async def _build_item_rows(
+        self, items: list[tuple[str, dict]], request_meta: dict
+    ) -> list[tuple]:
+        if not items:
+            return []
+
+        product_ids: set[str] = {item["product_id"] for _, item in items}
+        products_by_id: dict = {
+            product_id: await fetch_product(UUID(product_id), request_meta)
+            for product_id in product_ids
+        }
+
+        rows = []
+        for cart_id, item in items:
+            product = products_by_id.get(item["product_id"])
+            rows.append(
+                (
+                    product.id,
+                    product.name,
+                    product.description,
+                    product.serial,
+                    item["quantity"],
+                    item["price"],
+                    item["total_price"],
+                    item["created_at"],
+                    cart_id,
+                )
             )
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise ServerError() from exc
-
-    async def _update_cart_item(
-        self, cart_item: CartItem, circuit_key: str, request_meta: dict
-    ):
-        try:
-            self._item_repo.add(model=cart_item)
-        except Exception as exc:
-            message = (
-                "Error occured while updating cart item."
-                f"Cart_id: {cart_item.cart_id} - Product_id: {cart_item.product_id}."
-                f"Error: {str(exc)}"
-            )
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise ServerError() from exc
-
-    async def _delete_cart_item(
-        self, cart_item: CartItem, circuit_key: str, request_meta: dict
-    ):
-        try:
-            await self._item_repo.delete(model=cart_item)
-        except Exception as exc:
-            message = (
-                "Error occured while deleting cart item."
-                f"Cart_id: {cart_item.cart_id} - Product_id: {cart_item.product_id}."
-                f"Error: {str(exc)}"
-            )
-            circuit: dict = await self._redis_repo.get_hset(circuit_key)
-
-            log_error(message, request_meta, circuit)
-            raise ServerError() from exc
+        return rows

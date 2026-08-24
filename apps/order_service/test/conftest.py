@@ -220,9 +220,12 @@ product = {
 @pytest_asyncio.fixture(autouse=True)
 async def mock_get_product():
     with patch(
-        "apps.order_service.app.api.services.cart.get_product.apply_async"
+        "apps.order_service.app.utils.get_product.apply_async"
     ) as prd_mock:
-        prd_mock.return_value = {"span_id": str(uuid7()), "data": product}
+        prd_mock.return_value.get.return_value = {
+            "span_id": str(uuid7()),
+            "data": product,
+        }
 
         yield
 

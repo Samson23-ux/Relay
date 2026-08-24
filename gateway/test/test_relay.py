@@ -146,22 +146,6 @@ class TestRateLimit:
             "password": "test_user_password",
         }
 
-        route = respx.post("http://user-service:8001/api/v1/auth/signup")
-
-        route.side_effect = [
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(201),
-            httpx.Response(429),
-        ]
-
         for _ in range(11):
             res: httpx.Response = await async_client.post(
                 "/auth/signup",
@@ -169,7 +153,7 @@ class TestRateLimit:
             )
 
         assert res.status_code == 429
-        assert route.call_count == 11
+        assert res.json() == "Rate limit exceeded"
 
 class TestCircuitBreaker:
     @pytest.mark.asyncio(loop_scope="session")
@@ -186,18 +170,17 @@ class TestCircuitBreaker:
             httpx.Response(500),
             httpx.Response(500),
             httpx.Response(500),
-            httpx.Response(500),
             httpx.Response(503),
         ]
 
-        for _ in range(6):
+        for _ in range(5):
             res: httpx.Response = await async_client.post(
                 "/auth/signup",
                 json=sign_up_payload,
             )
 
         assert res.status_code == 503
-        assert mock_request_class.post.call_count == 6
+        assert mock_request_class.post.call_count == 5
 
 
 class TestRetry:

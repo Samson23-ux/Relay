@@ -12,7 +12,7 @@ class UserSettings(BaseSettings):
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_TIME: int = 5
+    ACCESS_TOKEN_EXPIRE_TIME: int = 15
     REFRESH_TOKEN_EXPIRE_TIME: int = 1
     ACCESS_TOKEN_SECRET_KEY: str
     REFRESH_TOKEN_SECRET_KEY: str

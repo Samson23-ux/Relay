@@ -7,11 +7,16 @@ from unittest.mock import patch
 
 @pytest_asyncio.fixture(autouse=True)
 async def mock_process_reservation():
-    with patch(
-        "apps.order_service.app.api.services.order.process_reservation.apply_async"
-    ) as prd_mock:
-        data = {"019fb2f7-2003-74d1-91fb-79bcb506c77f": ["50.00", 2]}
-        prd_mock.return_value = {"span_id": str(uuid7()), "data": data}
+    with (
+        patch(
+            "apps.order_service.app.utils.process_reservation.apply_async"
+        ) as prd_mock,
+        patch(
+            "apps.order_service.app.utils.restore_product_quantity.apply_async"
+        ) as restore_mock,
+    ):
+        prd_mock.return_value.get.return_value = {"span_id": str(uuid7())}
+        restore_mock.return_value.get.return_value = {"span_id": str(uuid7())}
 
         yield
 
@@ -24,7 +29,7 @@ class TestCreateOrder:
         json_res = create_order.json()
 
         assert create_order.status_code == 201
-        assert json_res["data"]["status"] == "pending"
+        assert json_res["data"]["status"] == "confirmed"
         assert json_res["data"]["total_price"] == "100.00"
         assert json_res["data"]["user_id"] == "019fbd28-ea23-76ef-b14a-64a857bc11f3"
 
@@ -54,7 +59,7 @@ class TestGetOrder:
 
         assert res.status_code == 200
         assert json_res["data"]["id"] == order_id
-        assert json_res["data"]["status"] == "pending"
+        assert json_res["data"]["status"] == "confirmed"
 
     @pytest.mark.asyncio
     async def test_order_not_found(

@@ -62,7 +62,7 @@ async def async_engine():
         '019fcbb2-f4ab-72eb-8551-6538813671ca',
         '019fbd28-ea23-76ef-b14a-64a857bc11f3',
         '501d2845-7d7c-4af5-bf4e-71d4613664ad',
-        'pending',
+        'processing',
         '80.00',
         NOW()
     )

@@ -16,5 +16,8 @@ class OrderItemService:
     async def _get_order_with_items(self, user_id: UUID, **filters):
         return await self._item_repo.get_order_with_items(user_id, **filters)
 
+    async def _get_orders_for_deletion(self, user_id: UUID, **filters):
+        return await self._item_repo.get_orders_for_deletion(user_id, **filters)
+
     async def create_order_items(self, order_items: list[dict]):
         await self._item_repo.insert_order_items(order_items)

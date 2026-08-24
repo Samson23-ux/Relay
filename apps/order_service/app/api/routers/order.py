@@ -24,8 +24,8 @@ async def get_orders(
     order_service: OrderServiceDep,
     request_meta: RequestMetaData,
     order_item_service: OrderItemServiceDep,
-    sort: Annotated[str, Query(description="Sort by created_at")] = None,
     items: Annotated[bool, Query(description="Return orders with items.")] = False,
+    sort: Annotated[str, Query(description="Sort by created_at")] = None,
     order: Annotated[str, Query(description="Order result in asc or desc")] = "asc",
 ):
     orders: list[OrderResponse | OrderItemResponse] = await order_service.get_orders(
@@ -83,5 +83,6 @@ async def delete_order(
     curr_user: CurrUserDep,
     request_meta: RequestMetaData,
     order_service: OrderServiceDep,
+    order_item_service: OrderItemServiceDep,
 ):
-    await order_service.delete_order(id, curr_user, request_meta)
+    await order_service.delete_order(id, curr_user, request_meta, order_item_service)

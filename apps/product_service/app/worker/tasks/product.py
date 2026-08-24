@@ -9,8 +9,16 @@ from shared.core.exceptions import MaxRetriesError
 from shared.worker.tasks.base import BaseTaskWithFailure
 from shared.core.shared_config import get_global_settings
 from apps.product_service.app.api.schemas.product import ProductInDB
-from apps.product_service.app.core.exceptions import ProductNotFoundError
 from apps.product_service.app.worker.services import get_product_service, get_uow
+from apps.order_service.app.api import models as _order_models  # noqa: F401
+from apps.product_service.app.core.exceptions import (
+    ProductNotFoundError,
+    OutOfStockError,
+    NotEnoughStockError,
+    TaskOutOfStockError,
+    TaskNotEnoughStockError,
+    TaskProductNotFoundError,
+)
 
 GLOBAL_SETTINGS = get_global_settings()
 
@@ -35,8 +43,35 @@ def get_product(self, product_id: str, request_meta: dict):
         )
 
         return {"data": product.model_dump(), "span_id": request_meta.get("span_id")}
-    except ProductNotFoundError as exc:
-        raise exc
+    except ProductNotFoundError:
+        raise TaskProductNotFoundError()
+    except Exception as exc:
+        raise Reject(exc, requeue=False)
+
+
+@celery_app.task(bind=True, base=BaseTaskWithFailure)
+def restore_product_quantity(self, payload: dict, request_meta: dict):
+    redis = get_redis_repo()
+    product_service = get_product_service()
+    message_id: str = payload.get("message_id")
+
+    try:
+        request_meta["task_id"] = UUID(self.request.id)
+        request_meta["parent_span_id"] = request_meta.get("span_id")
+        request_meta["span_id"] = str(uuid4())
+
+        restore_processed: str = redis.sync_get_key(f"restore:{message_id}")
+
+        if not restore_processed:
+            products = payload.get("products")
+            product_service.restore_product_quantity(products, request_meta)
+
+            redis.mark_task_processed(
+                f"restore:{message_id}", "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL
+            )
+        return {"span_id": request_meta.get("span_id")}
+    except ProductNotFoundError:
+        raise TaskProductNotFoundError()
     except Exception as exc:
         raise Reject(exc, requeue=False)
 
@@ -62,19 +97,20 @@ def process_reservation(self, payload: dict, request_meta: dict):
             request_meta["span_id"] = str(uuid4())
 
             if event == "reserve":
-                res = product_service.reserve_product(
+                product_service.reserve_product(
                     order_id, products, request_meta, uow
                 )
             elif event == "release_reserve":
-                res = product_service.release_reserve(order_id, products, request_meta)
+                product_service.release_reserve(order_id, products, request_meta)
             elif event == "confirm":
-                res = product_service.confirm_reserve(order_id, products, request_meta, uow)
+                product_service.confirm_reserve(
+                    order_id, products, request_meta, uow
+                )
 
             redis.mark_task_processed(
                 f"reserve:{message_id}", "1", GLOBAL_SETTINGS.IDEMPOTENCY_KEY_TTL
             )
-
-        return {"data": res, "span_id": request_meta.get("span_id")}
+        return {"span_id": request_meta.get("span_id")}
     except (
         psycopg2.OperationalError,
         psycopg2.InterfaceError,
@@ -86,5 +122,17 @@ def process_reservation(self, payload: dict, request_meta: dict):
             )
         except MaxRetriesError as exc:
             raise Reject(exc, requeue=False)
+    except (
+        OutOfStockError,
+        NotEnoughStockError,
+        ProductNotFoundError,
+    ) as exc:
+        prd_id = exc.id
+        if isinstance(exc, ProductNotFoundError):
+            raise TaskProductNotFoundError(prd_id)
+        elif isinstance(exc, OutOfStockError):
+            raise TaskOutOfStockError(prd_id)
+        elif isinstance(exc, NotEnoughStockError):
+            raise TaskNotEnoughStockError(prd_id)
     except Exception as exc:
         raise Reject(exc, requeue=False)

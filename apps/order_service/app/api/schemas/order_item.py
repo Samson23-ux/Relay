@@ -21,5 +21,6 @@ class OrderItemInDB(OrderItemBase):
 class OrderItemResponse(OrderItemBase):
     model_config = ConfigDict(from_attributes=True)
 
+    order_id: UUID
     product: ProductItem
     created_at: datetime

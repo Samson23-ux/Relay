@@ -34,7 +34,7 @@ class ProductUpdate(BaseModel):
 
 
 class ProductItem(BaseModel):
-    id: UUID
+    product_id: UUID
     name: str
     description: str
     serial: str

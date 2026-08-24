@@ -238,7 +238,10 @@ class AuthService:
         except Exception as e:
             await self._uow.rollback()
 
-            message = f"Error occured while trying to verify user {user_email} account. Error: {str(e)}"
+            message = (
+                f"Error occured while trying to verify user {user_email} account."
+                f"Error: {str(e)}"
+            )
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
 
             log_error(message, request_meta, circuit)
@@ -295,7 +298,10 @@ class AuthService:
         except Exception as e:
             await self._otp_repo.rollback()
 
-            message = f"Error occured while resending otp to user {user_email}. Error: {str(e)}"
+            message = (
+                f"Error occured while resending otp to user {user_email}."
+                f"Error: {str(e)}"
+            )
             circuit: dict = await self._redis_repo.get_hset(circuit_key)
 
             log_error(message, request_meta, circuit)

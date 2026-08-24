@@ -40,6 +40,12 @@ class ProductRepository(BaseRepository[ProductBase, Product]):
         res = await self._async_session.execute(select(self.model).limit(limit))
         return res.scalars().all()
 
+    async def get_products_by_ids(self, ids: list[UUID]) -> Sequence[Product]:
+        res = await self._async_session.execute(
+            select(self.model).where(self.model.id.in_(ids))
+        )
+        return res.scalars().all()
+
     def get_product_with_lock(self, read: bool, id: UUID) -> Product | None:
         base_stmt = select(self.model).where(self.model.id == id)
 

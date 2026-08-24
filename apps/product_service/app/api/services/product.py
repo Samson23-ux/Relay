@@ -216,12 +216,9 @@ class ProductService:
         self._reserve_repo.sync_session = self._uow.sync_session
 
         try:
-            product_details: dict[str, list[str]] = (
-                {}
-            )  # mapping of product id and list of price and quantity
             for product_id, quantity in products.items():
                 product_db: Product | None = self._product_repo.get_product_with_lock(
-                    True, id=product_id
+                    False, id=product_id
                 )
 
                 if not product_db:
@@ -238,29 +235,27 @@ class ProductService:
                     self._product_repo.get_product_total_reserve(product_id)
                 )
 
-                if total_reserve:
-                    if product_db.quantity - total_reserve < quantity:
-                        message = f"Product stock not enough. Id: {product_id}"
-                        log_error(message, request_meta)
-                        raise NotEnoughStockError(id=product_id)
+                total_reserve = total_reserve if total_reserve else 0
+
+                if product_db.quantity - total_reserve < quantity:
+                    message = f"Product stock not enough. Id: {product_id}"
+                    log_error(message, request_meta)
+                    raise NotEnoughStockError(id=product_id)
 
                 product_reserve = ProductReserveBase(
                     order_id=order_id, product_id=product_id, reserve=quantity
                 )
                 self._reserve_repo.reserve_product(product_reserve)
 
-                product_details[product_id] = [
-                    str(product_db.price),
-                    product_db.quantity,
-                ]
-
             self._uow.sync_commit()
 
             message = "Products reserved successfully"
             log_info(message, request_meta)
-
-            return product_details
-        except Exception as exc:
+        except (
+            OutOfStockError,
+            NotEnoughStockError,
+            ProductNotFoundError,
+        ) as exc:
             self._uow.sync_rollback()
 
             if isinstance(exc, ProductNotFoundError):
@@ -269,7 +264,7 @@ class ProductService:
                 raise OutOfStockError(id=product_id)
             elif isinstance(exc, NotEnoughStockError):
                 raise NotEnoughStockError(id=product_id)
-
+        except Exception as exc:
             message = (
                 f"Error occured while reserving product for orders. Error: {str(exc)}"
             )
@@ -292,7 +287,10 @@ class ProductService:
         except Exception as exc:
             self._reserve_repo.sync_rollback()
 
-            message = f"Error occured while releasing product reserve for orders. Error: {str(exc)}"
+            message = (
+                f"Error occured while releasing product reserve for orders."
+                f"Error: {str(exc)}"
+            )
             log_error(message, request_meta)
             raise ServerError() from exc
 
@@ -335,13 +333,39 @@ class ProductService:
 
             message = "Products reserved confirmed successfully"
             log_info(message, request_meta)
+        except ProductNotFoundError as exc:
+            raise ProductNotFoundError(id=product_id)
         except Exception as exc:
             self._uow.sync_rollback()
 
-            if isinstance(exc, ProductNotFoundError):
-                raise ProductNotFoundError(id=product_id)
+            message = (
+                f"Error occured while confirming product reserve for orders."
+                f"Error: {str(exc)}"
+            )
+            log_error(message, request_meta)
+            raise ServerError() from exc
 
-            message = f"Error occured while confirming product reserve for orders. Error: {str(exc)}"
+    def restore_product_quantity(self, products: dict[str, str], request_meta: dict):
+        try:
+            for prd_id, quantity in products.items():
+                product: Product | None = self._product_repo.get_product_with_lock(
+                    False, id=prd_id
+                )
+
+                if product:
+                    product.quantity += quantity
+
+            self._product_repo.sync_commit()
+
+            message = "Products quantity restored successfully"
+            log_info(message, request_meta)
+        except Exception as exc:
+            self._product_repo.sync_rollback()
+
+            message = (
+                f"Error occured while restoring quantity for products "
+                f"{list(products.keys())}. Error: {str(exc)}"
+            )
             log_error(message, request_meta)
             raise ServerError() from exc
 

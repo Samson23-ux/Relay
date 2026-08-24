@@ -8,6 +8,7 @@ from shared.middlewares.log import RequestLogMiddleware
 from shared.core.shared_config import get_global_settings
 from shared.core.exception_handlers import GlobalExceptionHandler
 from apps.order_service.app.core.exception_handlers import OrderExceptionHandler
+from apps.product_service.app.core.exception_handlers import ProductExceptionHandler
 
 GlOBAL_SETTINGS = get_global_settings()
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    lifespan=lifespan,
     title=GlOBAL_SETTINGS.API_TITLE,
     description=GlOBAL_SETTINGS.API_DESCRIPTION,
     version=GlOBAL_SETTINGS.API_VERSION,
@@ -33,3 +35,4 @@ app.add_middleware(RequestLogMiddleware)
 
 OrderExceptionHandler(app).add_handlers()
 GlobalExceptionHandler(app).add_handlers()
+ProductExceptionHandler(app).add_handlers()

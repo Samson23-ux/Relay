@@ -19,9 +19,10 @@ from shared.models.base import Base
 
 
 class OrderStatus(str, enum.Enum):
-    PENDING = "pending"
     PROCESSING = "processing"
+    CONFIRMED = "confirmed"
     DELIVERED = "delivered"
+    CANCELLED = "cancelled"
 
 
 class Order(Base):

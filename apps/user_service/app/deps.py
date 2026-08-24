@@ -10,6 +10,7 @@ from apps.user_service.app.api.services.auth import AuthService
 from apps.user_service.app.api.services.user import UserService
 from apps.user_service.app.api.repo.email import EmailRepository
 from apps.user_service.app.api.services.email import EmailService
+from apps.user_service.app.api.services.admin import AdminService
 
 
 # ------------------- Security dependency ------------------------------ #
@@ -51,10 +52,15 @@ async def get_user_service(user_repo: UserRepo, redis: RedisRepo) -> UserService
     return UserService(user_repo=user_repo, redis_repo=redis)
 
 
+async def get_admin_service(redis: RedisRepo) -> AdminService:
+    return AdminService(redis_repo=redis)
+
+
 async def get_email_service(email_repo: EmailRepo, redis_repo: RedisRepo) -> EmailService:
     return EmailService(email_repo=email_repo, redis_repo=redis_repo)
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+AdminServiceDep = Annotated[AdminService, Depends(get_admin_service)]
 EmailServiceDep = Annotated[EmailService, Depends(get_email_service)]

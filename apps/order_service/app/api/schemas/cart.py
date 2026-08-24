@@ -1,6 +1,9 @@
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, ConfigDict, Field
+
+
+from apps.order_service.app.api.schemas.cart_item import CartItemInDB
 
 
 class CartBase(BaseModel):
@@ -10,7 +13,8 @@ class CartBase(BaseModel):
 
 
 class CartInDB(CartBase):
-    pass
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    cart_items: list[CartItemInDB] = []
 
 
 class AddToCart(BaseModel):

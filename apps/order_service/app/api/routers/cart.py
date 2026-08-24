@@ -7,7 +7,7 @@ from shared.schemas.response import SuccessResponse
 from apps.order_service.app.api.schemas.cart_item import CartItemResponse
 from apps.order_service.app.deps import CartServiceDep, CartItemServiceDep
 from apps.order_service.app.api.schemas.cart import CartResponse, AddToCart
-from shared.shared_deps import CurrUserDep, RequestMetaData, UnitOfWorkRepo
+from shared.shared_deps import CurrUserDep, RequestMetaData
 
 router = APIRouter()
 
@@ -23,8 +23,8 @@ async def get_carts(
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
     cart_item_service: CartItemServiceDep,
-    sort: Annotated[str, Query(description="Sort by created_at")] = None,
     items: Annotated[bool, Query(description="Return carts with items.")] = False,
+    sort: Annotated[str, Query(description="Sort by created_at")] = None,
     order: Annotated[str, Query(description="Order result in asc or desc")] = "asc",
 ):
     carts: list[CartResponse | CartItemResponse] = await cart_service.get_carts(
@@ -60,7 +60,6 @@ async def get_cart_by_id(
     description="Create a new cart or add to an existing cart by providing its id",
 )
 async def create_cart(
-    uow: UnitOfWorkRepo,
     cart_item: AddToCart,
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
@@ -68,7 +67,7 @@ async def create_cart(
     cart_id: Annotated[UUID, Query(description="Id of an existing cart")] = None,
 ):
     cart: CartResponse = await cart_service.create_cart(
-        curr_user, request_meta, cart_item, cart_id, uow
+        curr_user, request_meta, cart_item, cart_id
     )
     return SuccessResponse(message="Cart created successfully", data=cart)
 
@@ -82,13 +81,12 @@ async def create_cart(
 async def remove_cart_item(
     cart_id: UUID,
     product_id: UUID,
-    uow: UnitOfWorkRepo,
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
     cart: CartResponse | list = await cart_service.remove_item(
-        cart_id, product_id, curr_user, request_meta, uow
+        cart_id, product_id, curr_user, request_meta
     )
     return SuccessResponse(message="Cart item removed successfully", data=cart)
 
@@ -102,14 +100,13 @@ async def remove_cart_item(
 async def increment_cart_item(
     cart_id: UUID,
     product_id: UUID,
-    uow: UnitOfWorkRepo,
     quantity: Annotated[int, Query(..., description="Quantity of product")],
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
     cart_items: CartItemResponse = await cart_service.increment_item(
-        cart_id, product_id, quantity, curr_user, request_meta, uow
+        cart_id, product_id, quantity, curr_user, request_meta
     )
     return SuccessResponse(
         message="Cart item incremented successfully", data=cart_items
@@ -129,14 +126,13 @@ async def increment_cart_item(
 async def decrement_cart_item(
     cart_id: UUID,
     product_id: UUID,
-    uow: UnitOfWorkRepo,
     quantity: Annotated[int, Query(..., description="Quantity of product")],
     curr_user: CurrUserDep,
     cart_service: CartServiceDep,
     request_meta: RequestMetaData,
 ):
     cart_items: CartItemResponse | list = await cart_service.decrement_item(
-        cart_id, product_id, quantity, curr_user, request_meta, uow
+        cart_id, product_id, quantity, curr_user, request_meta
     )
     return SuccessResponse(
         message="Cart item decremented successfully", data=cart_items

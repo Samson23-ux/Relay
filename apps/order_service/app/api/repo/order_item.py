@@ -28,7 +28,7 @@ class OrderItemRepository(BaseRepository[OrderItemBase, OrderItem]):
 
     def _get_sort_fields(self, sort):
         return [self.model.created_at]
-    
+
     async def get_order_with_items(self, user_id: UUID, **filters):
         filter_conditions = self._get_filters(**filters)
 
@@ -42,6 +42,7 @@ class OrderItemRepository(BaseRepository[OrderItemBase, OrderItem]):
                 self.model.price,
                 self.model.total_price,
                 self.model.created_at,
+                Order.id,
             )
             .select_from(Order)
             .join(self.model, Order.id == self.model.order_id)
@@ -62,6 +63,7 @@ class OrderItemRepository(BaseRepository[OrderItemBase, OrderItem]):
                 self.model.price,
                 self.model.total_price,
                 self.model.created_at,
+                Order.id,
             )
             .select_from(Order)
             .join(self.model, Order.id == self.model.order_id)
@@ -76,6 +78,23 @@ class OrderItemRepository(BaseRepository[OrderItemBase, OrderItem]):
             else:
                 stmt = stmt.order_by(*sort_fields)
 
+        res = await self._async_session.execute(stmt)
+        return res.all()
+
+    async def get_orders_for_deletion(self, user_id: UUID, **filters):
+        filter_conditions = self._get_filters(**filters)
+
+        stmt = (
+            select(
+                Order.status,
+                Product.id,
+                self.model.quantity
+            )
+            .select_from(Order)
+            .join(self.model, Order.id == self.model.order_id)
+            .join(Product, Product.id == self.model.product_id)
+            .where(*filter_conditions, Order.user_id == user_id)
+        )
         res = await self._async_session.execute(stmt)
         return res.all()
 

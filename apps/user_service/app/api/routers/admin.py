@@ -1,9 +1,9 @@
-from pathlib import Path
 from fastapi import APIRouter, Request
 
 
-from gateway.app.schemas.config import Config
-from gateway.app.core.load_config import load_config
+from shared.shared_deps import RequestMetaData
+from shared.schemas.response import SuccessResponse
+from apps.user_service.app.deps import AdminServiceDep
 
 router = APIRouter()
 
@@ -13,8 +13,9 @@ router = APIRouter()
     status_code=200,
     description="Reload config file (Admin only)",
 )
-async def reload_config(request: Request):
-    path = Path(__file__).parent / "core" / "config.yml"
-
-    raw_config = load_config(path)
-    request.app.state.config = Config.model_validate(raw_config)
+async def reload_config(
+    request_meta: RequestMetaData,
+    admin_service: AdminServiceDep,
+):
+    await admin_service.load_config(request_meta)
+    return SuccessResponse(message="Config reloaded successfully")

@@ -20,10 +20,12 @@ class ProductReserve(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(
         UUID,
         ForeignKey("orders.id", name="product_reserves_order_id_fk", ondelete="CASCADE"),
+        nullable=False
     )
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID,
         ForeignKey("products.id", name="product_reserves_product_id_fk", ondelete="CASCADE"),
+        nullable=False
     )
     reserve: Mapped[int | None] = mapped_column(
         Integer, CheckConstraint("reserve > 0", name="product_reserves_ck"), default=0

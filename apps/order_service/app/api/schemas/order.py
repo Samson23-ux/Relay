@@ -14,7 +14,7 @@ class OrderBase(BaseModel):
 
 
 class OrderInDB(OrderBase):
-    status: OrderStatus = OrderStatus.PENDING
+    status: OrderStatus = OrderStatus.PROCESSING
     total_price: Decimal = Field(..., decimal_places=2)
 
 

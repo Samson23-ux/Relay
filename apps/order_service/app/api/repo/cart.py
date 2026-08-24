@@ -1,38 +1,71 @@
-from sqlalchemy import select
+import json
+import asyncio
+from uuid import UUID, uuid4
 
 
-from shared.repo.base_repo import BaseRepository
-from apps.order_service.app.api.models.cart import Cart
-from apps.order_service.app.api.schemas.cart import CartBase
+from shared.repo.redis import RedisRepository
+
+LOCK_TTL = 5
+LOCK_WAIT_TIMEOUT = 3
+LOCK_RETRY_INTERVAL = 0.05
 
 
-class CartRepository(BaseRepository[CartBase, Cart]):
-    model = Cart
+class CartRepository:
+    def __init__(self, redis_repo: RedisRepository):
+        self._redis_repo = redis_repo
 
-    def _entity_to_model(self, entity):
-        return Cart(**entity.model_dump())
+    def _cart_key(self, cart_id: UUID) -> str:
+        return f"cart:{cart_id}"
 
-    def _get_filters(self, **filters):
-        filter_conditions = []
+    def _user_carts_key(self, user_id: UUID) -> str:
+        return f"user:{user_id}:carts"
 
-        if "id" in filters:
-            filter_conditions.append(self.model.id == filters["id"])
-        if "user_id" in filters:
-            filter_conditions.append(self.model.user_id == filters["user_id"])
-        return filter_conditions
+    def _lock_key(self, cart_id: UUID) -> str:
+        return f"lock:cart:{cart_id}"
 
-    def _get_sort_fields(self, sort):
-        return [self.model.created_at]
+    async def get_cart(self, cart_id: UUID) -> dict | None:
+        raw: str | None = await self._redis_repo.get_key(self._cart_key(cart_id))
+        return json.loads(raw) if raw else None
 
-    async def get_cart_with_lock(self, read: bool, **filters) -> Cart | None:
-        filter_conditions = self._get_filters(**filters)
+    async def get_carts(self, user_id: UUID, sort: str | None, order: str) -> list[dict]:
+        cart_ids: list[str] = await self._redis_repo.get_sorted_set(
+            self._user_carts_key(user_id), desc=bool(sort and order == "desc")
+        )
 
-        base_stmt = select(self.model).where(*filter_conditions)
+        carts = []
+        for cart_id in cart_ids:
+            cart = await self.get_cart(cart_id)
+            if cart:
+                carts.append(cart)
+        return carts
 
-        if read:
-            base_stmt = base_stmt.with_for_update(read=True)
-        else:
-            base_stmt = base_stmt.with_for_update()
+    async def save_cart(self, cart: dict):
+        await self._redis_repo.set_key(self._cart_key(cart["id"]), json.dumps(cart))
 
-        res = await self._async_session.execute(base_stmt)
-        return res.scalar()
+    async def index_cart(self, user_id: UUID, cart_id: UUID, created_at_ts: float):
+        await self._redis_repo.add_to_sorted_set(
+            self._user_carts_key(user_id), str(cart_id), created_at_ts
+        )
+
+    async def delete_cart(self, user_id: UUID, cart_id: UUID):
+        await self._redis_repo.delete_key(self._cart_key(cart_id))
+        await self._redis_repo.remove_from_sorted_set(
+            self._user_carts_key(user_id), str(cart_id)
+        )
+
+    async def acquire_lock(self, cart_id: UUID) -> str:
+        token: str = str(uuid4())
+        key: str = self._lock_key(cart_id)
+
+        waited = 0.0
+        while waited < LOCK_WAIT_TIMEOUT:
+            if await self._redis_repo.acquire_lock(key, token, LOCK_TTL):
+                return token
+
+            await asyncio.sleep(LOCK_RETRY_INTERVAL)
+            waited += LOCK_RETRY_INTERVAL
+
+        raise TimeoutError(f"Could not acquire lock for cart {cart_id}")
+
+    async def release_lock(self, cart_id: UUID, token: str):
+        await self._redis_repo.release_lock(self._lock_key(cart_id), token)

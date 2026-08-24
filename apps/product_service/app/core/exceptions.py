@@ -11,6 +11,21 @@ class ProductExistsError(AppException):
         self.name = name
 
 
+class TaskProductNotFoundError(Exception):
+    def __init__(self, id: UUID):
+        self.id = id
+
+
+class TaskOutOfStockError(Exception):
+    def __init__(self, id: UUID):
+        self.id = id
+
+
+class TaskNotEnoughStockError(Exception):
+    def __init__(self, id: UUID):
+        self.id = id
+
+
 class ProductNotFoundError(AppException):
     """Product not found"""
 

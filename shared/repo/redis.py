@@ -10,6 +10,9 @@ class RedisRepository:
     async def set_key(self, key: str, value: str, expire: int = None):
         await self._async_redis.set(key, value, ex=expire)
 
+    async def publish(self, channel: str, message: str):
+        await self._async_redis.publish(channel, message)
+
     async def create_hset(self, key: str, mapping: dict):
         await self._async_redis.hset(key, mapping=mapping)
 
@@ -27,6 +30,24 @@ class RedisRepository:
 
     async def delete_key(self, key: str):
         await self._async_redis.delete(key)
+
+    async def add_to_sorted_set(self, key: str, member: str, score: float):
+        await self._async_redis.zadd(key, {member: score})
+
+    async def get_sorted_set(self, key: str, desc: bool = False) -> list[str]:
+        if desc:
+            return await self._async_redis.zrevrange(key, 0, -1)
+        return await self._async_redis.zrange(key, 0, -1)
+
+    async def remove_from_sorted_set(self, key: str, member: str):
+        await self._async_redis.zrem(key, member)
+
+    async def acquire_lock(self, key: str, token: str, ttl: int) -> bool:
+        return bool(await self._async_redis.set(key, token, nx=True, ex=ttl))
+
+    async def release_lock(self, key: str, token: str):
+        if await self._async_redis.get(key) == token:
+            await self._async_redis.delete(key)
 
     # sync
 
