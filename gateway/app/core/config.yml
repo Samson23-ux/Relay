@@ -139,3 +139,15 @@ routes:
       requests: 50
       window: 60s
       key_by: user_email
+
+  - path: /api/v1/admin
+    methods: ["patch"]
+    strip_prefix: /api/v1
+    auth_required: true
+    limit_requests: true
+    revoke_token: false
+    roles: [admin]
+    rate_limit:
+      requests: 10
+      window: 120s
+      key_by: user_email

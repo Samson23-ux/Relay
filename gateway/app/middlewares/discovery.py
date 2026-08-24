@@ -23,15 +23,17 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
 
         self._upstream_mapping = {
             "auth": "user_service",
+            "admin": "user_service",
             "products": "product_service",
             "orders": "order_service",
             "carts": "order_service",
         }
 
     async def dispatch(self, request, call_next):
-        config: Config = request.app.state.config
         request_path = request.url.path
         request_method = request.method.lower()
+
+        config: Config = request.app.state.config
 
         matched_route = None
         for route in config.routes:

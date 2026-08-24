@@ -9,17 +9,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def _limit_script(self) -> str:
         # KEYS -> [set key]
-        # ARGV -> [cutoff, current_time]
+        # ARGV -> [cutoff, current_time(now), route_requests, value(unique_request_id)]
         return """
         redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1])
-        return redis.call('ZCOUNT', KEYS[1], ARGV[1], ARGV[2])
-        """
+        local requests = redis.call('ZCOUNT', KEYS[1], ARGV[1], ARGV[2])
 
-    def _add_script(self) -> str:
-        # KEYS -> [set key]
-        # ARGV -> [score(now), value(unique_request_id)]
-        return """
-        redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+        if requests >= tonumber(ARGV[3]) then
+            return nil
+        end
+
+        return redis.call('ZADD', KEYS[1], ARGV[2], ARGV[4])
         """
 
     def normalize_request_path(self, request: Request) -> str:
@@ -40,8 +39,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             """
 
             redis: Redis = request.app.state.redis
-
-            add_script = redis.register_script(self._add_script())
             limit_script = redis.register_script(self._limit_script())
 
             key_by: str = request.state.key_by
@@ -59,12 +56,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             set_key: str = f"rate_limit:{normalized_path}:{key_by}"
 
-            request_count = await limit_script(keys=[set_key], args=[cutoff, now])
+            route_requests = request.state.requests
 
-            if request_count > request.state.requests:
+            res = await limit_script(
+                keys=[set_key], args=[cutoff, now, route_requests, str(uuid4())]
+            )
+
+            if res is None:
                 return JSONResponse(content="Rate limit exceeded", status_code=429)
-
-            await add_script(keys=[set_key], args=[now, str(uuid4())])
 
         res = await call_next(request)
         return res

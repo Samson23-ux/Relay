@@ -15,6 +15,10 @@ class LoadBalancerMiddleware(BaseHTTPMiddleware):
         self._redis = None
 
     async def select_request_instance(self, request):
+        """
+        The instance with the least amount of request
+        being processed is selected
+        """
         config: Config = request.app.state.config
 
         instances = []
@@ -30,7 +34,6 @@ class LoadBalancerMiddleware(BaseHTTPMiddleware):
 
         for i in instances:
             key: str = f"upstream:instance:{i}"
-
             curr_value = await self._redis.get_key(key)
 
             if curr_value is None:
@@ -75,7 +78,7 @@ class LoadBalancerMiddleware(BaseHTTPMiddleware):
                 last_seen_value = min(last_seen_value, int(curr_value))
             selected_instances.append(curr_instance)
 
-        request.state.upstream_instance = selected_instances        
+        request.state.upstream_instance = selected_instances
 
     async def dispatch(self, request, call_next):
         self._redis = RedisRepository(async_redis=request.app.state.redis)
