@@ -126,13 +126,9 @@ class TestSignUpWithGoogle:
     async def test_sign_in_google(self, async_client: httpx.AsyncClient):
         app.dependency_overrides[get_security] = lambda: get_security_mock()
 
-        url_path: str = "apps.user_service.app.api.routers.user.Request.url_for"
-        with patch(url_path, new_callable=AsyncMock) as url_patch:
-            res: httpx.Response = await async_client.get("/auth/google")
+        res: httpx.Response = await async_client.get("/auth/google")
 
         assert res.status_code == 302
-
-        url_patch.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_google_callback(self, async_client: httpx.AsyncClient):

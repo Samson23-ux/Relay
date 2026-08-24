@@ -78,23 +78,23 @@ async def get_current_user(
 
     user_type: str = request.headers.get("x-user-type")
     user_email: str = request.headers.get("x-user-email")
-    route_roles: list[str] = json.loads(request.headers.get("x-route-roles"))
+
+    route_roles_header: str | None = request.headers.get("x-route-roles")
+    route_roles: list[str] | None = (
+        json.loads(route_roles_header) if route_roles_header else None
+    )
+
+    filters: dict = {"email": user_email, "is_verified": True}
+    if route_roles:
+        filters["role"] = route_roles
 
     if user_type == "email":
         curr_user: User = await user_service.get_user_by_email(
-            circuit_key,
-            request_meta,
-            email=user_email,
-            is_verified=True,
-            role=route_roles,
+            circuit_key, request_meta, **filters
         )
     else:
         curr_user: User = await user_service.get_user_by_email(
-            circuit_key,
-            request_meta,
-            email=user_email,
-            is_verified=True,
-            role=route_roles,
+            circuit_key, request_meta, **filters
         )
 
     return curr_user
