@@ -96,7 +96,15 @@ class DiscoveryMiddleware(BaseHTTPMiddleware):
             # e.g. "/api/v1/auth" -> "auth" — same for base route and any of its exceptions
             upstream_key = matched_route.path.strip("/").split("/")[-1]
 
-            request.state.request_route = request_path
+            if matched_route.strip_prefix and request_path.startswith(
+                matched_route.strip_prefix
+            ):
+                request.state.request_route = (
+                    request_path[len(matched_route.strip_prefix):] or "/"
+                )
+            else:
+                request.state.request_route = request_path
+
             request.state.upstream = self._upstream_mapping.get(upstream_key)
 
         res = await call_next(request)

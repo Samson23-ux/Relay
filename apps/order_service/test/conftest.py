@@ -202,7 +202,7 @@ async def async_client(async_session: AsyncSession, test_redis_client: Redis):
 
     async with LifespanManager(app):
         async with AsyncClient(
-            transport=ASGITransport(app), base_url="http://localhost/api/v1"
+            transport=ASGITransport(app), base_url="http://localhost"
         ) as client:
             yield client
 

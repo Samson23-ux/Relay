@@ -14,7 +14,6 @@ class GlobalSettings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # api details
-    API_PREFIX: str = "/api/v1"
     API_TITLE: str = "Relay"
     API_VERSION: str = "v1.0"
     API_DESCRIPTION: str = "A Minimalistic API Gateway"
