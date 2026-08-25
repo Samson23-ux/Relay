@@ -32,6 +32,42 @@ async def async_engine():
         url=get_global_settings().ASYNC_TEST_DB_URL, poolclass=NullPool
     )
 
+    async with async_db_engine.begin() as conn:
+        await conn.execute(text("""
+            CREATE OR REPLACE FUNCTION uuid_generate_v7()
+                RETURNS UUID
+                LANGUAGE SQL
+                VOLATILE
+                AS $$
+                    SELECT encode(
+                        set_bit(
+                            set_bit(
+                                overlay(
+                                    uuid_send(gen_random_uuid())
+                                    placing substring(int8send(floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint) FROM 3)
+                                    FROM 1 FOR 6
+                                ),
+                                52, 1
+                            ),
+                            53, 1
+                        ),
+                        'hex'
+                    )::uuid
+                $$;
+        """))
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield async_db_engine
+
+    async with async_db_engine.begin() as conn:
+        await conn.execute(text("DROP FUNCTION IF EXISTS uuid_generate_v7 CASCADE"))
+        await conn.execute(text("DROP EXTENSION IF EXISTS pgcrypto CASCADE"))
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await async_db_engine.dispose()
+
+
+async def seed_data(conn: AsyncConnection):
     user_stmt = """
         INSERT INTO users (
         id,
@@ -65,50 +101,19 @@ async def async_engine():
         'processing',
         '80.00',
         NOW()
-    )
+    );
     """
 
-    async with async_db_engine.begin() as conn:
-        await conn.execute(text("""
-            CREATE OR REPLACE FUNCTION uuid_generate_v7()
-                RETURNS UUID
-                LANGUAGE SQL
-                VOLATILE
-                AS $$
-                    SELECT encode(
-                        set_bit(
-                            set_bit(
-                                overlay(
-                                    uuid_send(gen_random_uuid())
-                                    placing substring(int8send(floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint) FROM 3)
-                                    FROM 1 FOR 6
-                                ),
-                                52, 1
-                            ),
-                            53, 1
-                        ),
-                        'hex'
-                    )::uuid
-                $$;
-        """))
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(text(user_stmt))
-        await conn.execute(text(order_stmt))
-
-    yield async_db_engine
-
-    async with async_db_engine.begin() as conn:
-        await conn.execute(text("DROP FUNCTION IF EXISTS uuid_generate_v7 CASCADE"))
-        await conn.execute(text("DROP EXTENSION IF EXISTS pgcrypto CASCADE"))
-        await conn.run_sync(Base.metadata.drop_all)
-
-    await async_db_engine.dispose()
+    await conn.execute(text(user_stmt))
+    await conn.execute(text(order_stmt))
 
 
 @pytest_asyncio.fixture
 async def async_session(async_engine: AsyncEngine):
     async_connection: AsyncConnection = await async_engine.connect()
     async_transaction: AsyncTransaction = await async_connection.begin()
+
+    await seed_data(async_connection)
 
     session = async_sessionmaker(
         bind=async_connection,

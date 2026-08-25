@@ -33,74 +33,6 @@ async def async_engine():
         url=get_global_settings().ASYNC_TEST_DB_URL, poolclass=NullPool
     )
 
-    user_stmt = """
-        INSERT INTO users (
-        id,
-        type,
-        role,
-        email,
-        hashed_password,
-        is_active,
-        is_verified,
-        created_at
-        )
-        VALUES
-        (
-            '019fbd28-ea23-76ef-b14a-64a857bc11f3',
-            'email',
-            'user',
-            'user@example.com',
-            'test_user_password',
-            'true',
-            'true',
-            NOW()
-        );
-    """
-
-    prd_1_stmt = """
-        INSERT INTO products (
-        id,
-        name,
-        description,
-        serial,
-        price,
-        quantity,
-        created_at
-        )
-        VALUES
-        (
-            '019fb2f7-2003-74d1-91fb-79bcb506c77f',
-            'test_product',
-            'This is a fake test product.',
-            'EumHUV41owYwmnzpjVKYng',
-            '50.00',
-            '50',
-            NOW()
-        );
-    """
-
-    prd_2_stmt = """
-        INSERT INTO products (
-        id,
-        name,
-        description,
-        serial,
-        price,
-        quantity,
-        created_at
-        )
-        VALUES
-        (
-            '019fbd53-b8da-75fc-904e-b1d70c2e2c6e',
-            'test_product_1',
-            'This is a fake test product.',
-            'L9ZWvaU24w42iqYNQKv1Vw',
-            '50.00',
-            '50',
-            NOW()
-        );
-    """
-
     async with async_db_engine.begin() as conn:
         await conn.execute(text("""
             CREATE OR REPLACE FUNCTION uuid_generate_v7()
@@ -125,9 +57,6 @@ async def async_engine():
                 $$;
         """))
         await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(text(user_stmt))
-        await conn.execute(text(prd_1_stmt))
-        await conn.execute(text(prd_2_stmt))
 
     yield async_db_engine
 
@@ -138,11 +67,86 @@ async def async_engine():
 
     await async_db_engine.dispose()
 
+async def seed_data(conn: AsyncConnection):
+    user_stmt = """
+        INSERT INTO users (
+        id,
+        type,
+        role,
+        email,
+        hashed_password,
+        is_active,
+        is_verified,
+        created_at
+        )
+        VALUES
+        (
+            '019fbd28-ea23-76ef-b14a-64a857bc11f3',
+            'email',
+            'user',
+            'user@example.com',
+            'test_user_password',
+            'true',
+            'true',
+            NOW()
+        );
+    """
+    
+    prd_1_stmt = """
+        INSERT INTO products (
+        id,
+        name,
+        description,
+        serial,
+        price,
+        quantity,
+        created_at
+        )
+        VALUES
+        (
+            '019fb2f7-2003-74d1-91fb-79bcb506c77f',
+            'test_product',
+            'This is a fake test product.',
+            'EumHUV41owYwmnzpjVKYng',
+            '50.00',
+            '50',
+            NOW()
+        );
+    """
+    
+    prd_2_stmt = """
+        INSERT INTO products (
+        id,
+        name,
+        description,
+        serial,
+        price,
+        quantity,
+        created_at
+        )
+        VALUES
+        (
+            '019fbd53-b8da-75fc-904e-b1d70c2e2c6e',
+            'test_product_1',
+            'This is a fake test product.',
+            'L9ZWvaU24w42iqYNQKv1Vw',
+            '50.00',
+            '50',
+            NOW()
+        );
+    """
+
+    await conn.execute(text(user_stmt))
+    await conn.execute(text(prd_1_stmt))
+    await conn.execute(text(prd_2_stmt))
+
 
 @pytest_asyncio.fixture
 async def async_session(async_engine: AsyncEngine):
     async_connection: AsyncConnection = await async_engine.connect()
     async_transaction: AsyncTransaction = await async_connection.begin()
+
+    await seed_data(async_connection)
 
     session = async_sessionmaker(
         bind=async_connection,
