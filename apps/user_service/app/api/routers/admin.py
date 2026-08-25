@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 
 from shared.shared_deps import RequestMetaData
